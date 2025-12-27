@@ -35,13 +35,13 @@ public class User {
     @NotBlank(message = "Phone number is required")
     private String phoneNumber;
 
+    @Column(name = "email", unique = true)
     @Email(message = "Invalid email format")
     @NotBlank(message = "Email is required")
     private String email;
 
-    @Column(name = "user_type")
-    @NotBlank(message = "User Type needs to be specified")
-    private Integer userType;       //1 -> admin      2-> normal user
+    @Column(name = "user_role")
+    private String role;       //1 -> admin      2-> normal user
 
     @Column(name = "active_flg")
     private boolean activeFlg;
