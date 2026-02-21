@@ -11,10 +11,11 @@ import java.util.Date;
 
 @Service
 public class JwtService {
-    private final String SECRET_KEY = "tolunity_2002";
+    private final String SECRET_KEY = "tolunity_unite_the_toll_come_together";
 
-    public String generateToken(UserDetails userDetails){
-        return Jwts.builder().setSubject(userDetails.getUsername())
+    public String generateToken(Long userId, String role){
+        return Jwts.builder().setSubject(String.valueOf(userId))
+                .claim("role", role)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + 1000 *60 *60))
                 .signWith(Keys.hmacShaKeyFor(SECRET_KEY.getBytes()), SignatureAlgorithm.HS256)

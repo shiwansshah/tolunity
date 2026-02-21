@@ -10,6 +10,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.Date;
 
 @Getter
 @Setter
@@ -44,13 +45,13 @@ public class User {
     private String role;       //1 -> admin      2-> normal user
 
     @Column(name = "active_flg")
-    private boolean activeFlg;
+    private boolean activeFlg = true;
 
     @Column(name = "del_flg")
-    private boolean delFlg;
+    private boolean delFlg = false;
 
     @CreationTimestamp
-    private LocalDateTime createdAt;
+    private Date createdAt;
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;

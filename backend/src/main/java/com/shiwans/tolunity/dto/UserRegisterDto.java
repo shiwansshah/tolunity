@@ -8,5 +8,5 @@ public class UserRegisterDto {
     private String email;
     private String phoneNumber;
     private String password;
-    private Integer userType;
+    private String userType;
 }
