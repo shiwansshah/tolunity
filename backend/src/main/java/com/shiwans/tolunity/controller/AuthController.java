@@ -19,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -41,10 +42,13 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody UserRegisterDto request){
 
-        if(userRepo.findUserByEmail(request.getEmail()).isPresent()){
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Email is already registered!"));
-        }
+        List<User> userList = userRepo.findAll();
+        for (User user : userList){
+            if(request.getEmail().equals(user.getEmail())){
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Email is already registered!"));
+            }
 
+        }
         User user = new User();
         user.setName(request.getName());
         user.setEmail(request.getEmail());
@@ -64,19 +68,18 @@ public class AuthController {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
 
-            Optional<User> user = userRepo.findUserByEmail(request.getEmail().toLowerCase());
-
-            if (user.isEmpty()) {
+            User user = userRepo.findUserByEmail(request.getEmail().toLowerCase());
+            if (user == null) {
                 throw new UsernameNotFoundException("User Not Found!");
             }
 
-            String token = jwtService.generateToken(user.get().getEmail(), user.get().getRole().toString());
+            String token = jwtService.generateToken(user.getEmail(), user.getRole().toString());
 
             LoginResponseDto response = new LoginResponseDto();
             response.setToken(token);
-            response.setName(user.get().getName());
-            response.setEmail(user.get().getEmail());
-            response.setUserRole(user.get().getRole().toString());
+            response.setName(user.getName());
+            response.setEmail(user.getEmail());
+            response.setUserRole(user.getRole().toString());
 
             return ResponseEntity.ok(response);
         } catch (BadCredentialsException ex){
