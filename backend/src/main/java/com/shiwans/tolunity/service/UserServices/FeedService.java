@@ -1,0 +1,387 @@
+package com.shiwans.tolunity.service.UserServices;
+
+import com.shiwans.tolunity.Repo.UserRepos.PostCommentRepository;
+import com.shiwans.tolunity.Repo.UserRepos.PostLikeRepository;
+import com.shiwans.tolunity.Repo.UserRepos.PostMediaRepository;
+import com.shiwans.tolunity.Repo.UserRepos.PostRepository;
+import com.shiwans.tolunity.Repo.UserRepository;
+import com.shiwans.tolunity.Util.SecurityUtil;
+import com.shiwans.tolunity.dto.UserDTOs.CreatePostRequest;
+import com.shiwans.tolunity.dto.UserDTOs.FeedPostsResponse;
+import com.shiwans.tolunity.entities.User;
+import com.shiwans.tolunity.entities.UserEntities.UserFeed.Post;
+import com.shiwans.tolunity.entities.UserEntities.UserFeed.PostComment;
+import com.shiwans.tolunity.entities.UserEntities.UserFeed.PostLike;
+import com.shiwans.tolunity.entities.UserEntities.UserFeed.PostMedia;
+import com.shiwans.tolunity.enums.MediaTypeEnum;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.parameters.P;
+import org.springframework.stereotype.Service;
+import org.w3c.dom.stylesheets.MediaList;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+@Service
+public class FeedService {
+
+    @Autowired
+    private PostRepository postRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PostMediaRepository postMediaRepository;
+
+    @Autowired
+    private PostLikeRepository postLikeRepository;
+
+    @Autowired
+    private PostCommentRepository postCommentRepository;
+
+    public ResponseEntity<?> createPost(CreatePostRequest request) {
+        try {
+            if(request.getContent() == null || request.getContent().isEmpty()) {
+                throw new Exception("Post content cannot be empty");
+            }
+            Post post = new Post();
+
+            post.setPostContent(request.getContent());
+
+            User user = userRepository.findUserById(SecurityUtil.getCurrentUserId());
+            post.setUser(user);
+
+            postRepository.save(post);
+
+            if(request.getMediaList() !=null && !request.getMediaList().isEmpty()){
+                request.getMediaList().forEach(media -> {
+                    PostMedia postMedia = new PostMedia();
+                    postMedia.setMediaUrl(media.getMediaUrl());
+                    postMedia.setPost(post);
+                    if("image".equalsIgnoreCase(media.getMediaType())){
+                        postMedia.setMediaType(MediaTypeEnum.IMAGE);
+                    } else if("video".equalsIgnoreCase(media.getMediaType())){
+                        postMedia.setMediaType(MediaTypeEnum.VIDEO);
+                    } else {
+                        try {
+                            throw new Exception("Please specify appropiate media type!");
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                    postMediaRepository.save(postMedia);
+                });
+            }
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Post created successfully");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Failed to create post: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    public ResponseEntity<?> editPost(Long postId, CreatePostRequest request) {
+
+        try {
+
+            if (request.getContent() == null || request.getContent().isEmpty()) {
+                throw new Exception("Post content cannot be empty");
+            }
+
+            User user = userRepository.findUserById(SecurityUtil.getCurrentUserId());
+            if (user == null) {
+                throw new Exception("User Not Found!");
+            }
+
+            Post post = postRepository.findById(postId)
+                    .orElseThrow(() -> new RuntimeException("Post not found"));
+
+            // check ownership
+            if (!post.getUser().getId().equals(user.getId())) {
+                return ResponseEntity.status(403)
+                        .body(Map.of("error", "You cannot edit this post"));
+            }
+
+            // update content
+            post.setPostContent(request.getContent());
+            postRepository.save(post);
+
+            // remove old media
+            postMediaRepository.deleteAllByPostId(postId);
+
+            // add updated media
+            if (request.getMediaList() != null && !request.getMediaList().isEmpty()) {
+
+                request.getMediaList().forEach(media -> {
+
+                    PostMedia postMedia = new PostMedia();
+                    postMedia.setMediaUrl(media.getMediaUrl());
+                    postMedia.setPost(post);
+
+                    if ("image".equalsIgnoreCase(media.getMediaType())) {
+                        postMedia.setMediaType(MediaTypeEnum.IMAGE);
+                    } else if ("video".equalsIgnoreCase(media.getMediaType())) {
+                        postMedia.setMediaType(MediaTypeEnum.VIDEO);
+                    } else {
+                        throw new RuntimeException("Please specify appropriate media type!");
+                    }
+
+                    postMediaRepository.save(postMedia);
+                });
+            }
+
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Post updated successfully");
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Failed to update post: " + e.getMessage());
+
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    public ResponseEntity<?> deletePost(Long postId) {
+
+        try {
+
+            User user = userRepository.findUserById(SecurityUtil.getCurrentUserId());
+            if (user == null) {
+                throw new Exception("User Not Found!");
+            }
+
+            Post post = postRepository.findById(postId)
+                    .orElseThrow(() -> new RuntimeException("Post not found"));
+
+            // check ownership
+            if (!post.getUser().getId().equals(user.getId())) {
+                return ResponseEntity.status(403)
+                        .body(Map.of("error", "You cannot delete this post"));
+            }
+
+            if (post.isDelFlg()) {
+                return ResponseEntity.ok(Map.of("message", "Post already deleted"));
+            }
+
+            post.setDelFlg(true);
+
+            postRepository.save(post);
+
+            return ResponseEntity.ok(Map.of("message", "Post deleted successfully"));
+
+        } catch (Exception e) {
+
+            return ResponseEntity.status(500)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+
+    public ResponseEntity<?> getFeed(Pageable pageable) {
+
+        try {
+
+            User user = userRepository.findUserById(SecurityUtil.getCurrentUserId());
+            if(user == null){
+                throw new Exception("User Not Found!");
+            }
+
+            Long currentUserId = user.getId();
+
+            Page<Post> posts = postRepository.findAllByDelFlgFalseOrderByCreatedAtDesc(pageable);
+
+            Page<FeedPostsResponse> response =
+                    posts.map(post -> mapToResponse(post, currentUserId));
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Failed to fetch feed: " + e.getMessage());
+
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+
+
+    private FeedPostsResponse mapToResponse(Post post, Long currentUserId) {
+
+        FeedPostsResponse response = new FeedPostsResponse();
+
+        response.setPostId(post.getId());
+        response.setAuthorUsername(post.getUser().getName());
+        response.setAuthorProfilePictureUrl(post.getUser().getProfilePic());
+        response.setContent(post.getPostContent());
+        response.setLikesCount(post.getPostLikes());
+        response.setCommentsCount(post.getPostComments());
+        response.setCreatedAt(post.getCreatedAt());
+
+        boolean liked =
+                postLikeRepository.existsByPostIdAndUserId(post.getId(), currentUserId);
+
+        response.setLikedByCurrentUser(liked);
+
+        List<PostMedia> mediaListForFeedPost =
+                postMediaRepository.findAllByPostId(post.getId());
+
+        List<FeedPostsResponse.Media> mediaList =
+                mediaListForFeedPost.stream().map(media -> {
+
+                    FeedPostsResponse.Media m = new FeedPostsResponse.Media();
+                    m.setMediaUrl(media.getMediaUrl());
+                    m.setMediaType(media.getMediaType().name());
+
+                    return m;
+
+                }).toList();
+
+        response.setMedias(mediaList);
+
+        return response;
+    }
+    public ResponseEntity<?> toggleLike(Long postId) {
+
+        try {
+
+            User user = userRepository.findUserById(SecurityUtil.getCurrentUserId());
+            if(user == null){
+                throw new Exception("User Not Found!");
+            }
+            Post post = postRepository.findById(postId)
+                    .orElseThrow(() -> new RuntimeException("Post not found"));
+
+            Optional<PostLike> existingLike =
+                    postLikeRepository.findByPostIdAndUserId(postId, user.getId());
+
+            Map<String, Object> response = new HashMap<>();
+
+            if (existingLike.isPresent()) {
+
+                // UNLIKE
+                postLikeRepository.delete(existingLike.get());
+
+                if (post.getPostLikes() > 0) {
+                    post.setPostLikes(post.getPostLikes() - 1);
+                }
+
+                response.put("liked", false);
+                response.put("message", "Post unliked");
+
+            } else {
+
+                // LIKE
+                PostLike like = new PostLike();
+                like.setPost(post);
+                like.setUser(user);
+
+                postLikeRepository.save(like);
+
+                post.setPostLikes(post.getPostLikes() + 1);
+
+                response.put("liked", true);
+                response.put("message", "Post liked");
+            }
+
+            postRepository.save(post);
+
+            response.put("likesCount", post.getPostLikes());
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Failed to toggle like: " + e.getMessage());
+
+            return ResponseEntity.status(500).body(error);
+        }
+    }
+
+    public ResponseEntity<?> createComment(Long postId, String content) {
+
+        try {
+
+            User user = userRepository.findUserById(SecurityUtil.getCurrentUserId());
+            if(user == null){
+                throw new Exception("User Not Found!");
+            }
+
+            Post post = postRepository.findById(postId)
+                    .orElseThrow(() -> new RuntimeException("Post not found"));
+
+            PostComment comment = new PostComment();
+            comment.setPostComment(content);
+            comment.setUser(user);   // who wrote the comment
+            comment.setPost(post);
+
+            postCommentRepository.save(comment);
+
+            post.setPostComments(post.getPostComments() + 1);
+            postRepository.save(post);
+
+            return ResponseEntity.ok(Map.of("message", "Comment created"));
+
+        } catch (Exception e) {
+
+            return ResponseEntity.status(500)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    public ResponseEntity<?> deleteComment(Long commentId) {
+
+        try {
+
+            User user = userRepository.findUserById(SecurityUtil.getCurrentUserId());
+            if (user == null) {
+                throw new Exception("User Not Found!");
+            }
+
+            PostComment comment = postCommentRepository.findById(commentId)
+                    .orElseThrow(() -> new RuntimeException("Comment not found"));
+
+            // check ownership
+            if (!comment.getUser().getId().equals(user.getId())) {
+                return ResponseEntity.status(403)
+                        .body(Map.of("error", "You are not allowed to delete this comment"));
+            }
+
+            if (comment.isDelFlg()) {
+                return ResponseEntity.ok(Map.of("message", "Comment already deleted"));
+            }
+
+            // soft delete
+            comment.setDelFlg(true);
+            postCommentRepository.save(comment);
+
+            Post post = comment.getPost();
+
+            if (post.getPostComments() > 0) {
+                post.setPostComments(post.getPostComments() - 1);
+                postRepository.save(post);
+            }
+
+            return ResponseEntity.ok(Map.of("message", "Comment deleted successfully"));
+
+        } catch (Exception e) {
+
+            return ResponseEntity.status(500)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+}

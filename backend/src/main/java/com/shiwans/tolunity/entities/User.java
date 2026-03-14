@@ -1,6 +1,7 @@
 package com.shiwans.tolunity.entities;
 
 
+import com.shiwans.tolunity.enums.UserRolesEnum;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -41,8 +42,12 @@ public class User {
     @NotBlank(message = "Email is required")
     private String email;
 
+    @Column(name = "profile_pic")
+    private String profilePic; // URL or path to profile picture
+
     @Column(name = "user_role")
-    private String role;       //1 -> admin      2-> normal user
+    @Enumerated(EnumType.STRING)
+    private UserRolesEnum role;       //ROLE_USER, ROLE_ADMIN
 
     @Column(name = "active_flg")
     private boolean activeFlg = true;

@@ -1,4 +1,4 @@
-package com.shiwans.tolunity.security;
+package com.shiwans.tolunity.config;
 
 import com.shiwans.tolunity.service.CustomUserDetailsService;
 import com.shiwans.tolunity.service.JwtService;

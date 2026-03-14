@@ -13,8 +13,8 @@ import java.util.Date;
 public class JwtService {
     private final String SECRET_KEY = "tolunity_unite_the_toll_come_together";
 
-    public String generateToken(Long userId, String role){
-        return Jwts.builder().setSubject(String.valueOf(userId))
+    public String generateToken(String userEmail, String role){
+        return Jwts.builder().setSubject(userEmail)
                 .claim("role", role)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + 1000 *60 *60))

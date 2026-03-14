@@ -6,6 +6,7 @@ import com.shiwans.tolunity.dto.LoginResponseDto;
 import com.shiwans.tolunity.dto.UserLoginDto;
 import com.shiwans.tolunity.dto.UserRegisterDto;
 import com.shiwans.tolunity.entities.User;
+import com.shiwans.tolunity.enums.UserRolesEnum;
 import com.shiwans.tolunity.service.JwtService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -49,7 +50,7 @@ public class AuthController {
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setPhoneNumber(request.getPhoneNumber());
-        user.setRole("ROLE_USER");
+        user.setRole(UserRolesEnum.ROLE_USER);
         user.setCreatedAt(new Date());
 
         userRepo.save(user);
@@ -69,13 +70,13 @@ public class AuthController {
                 throw new UsernameNotFoundException("User Not Found!");
             }
 
-            String token = jwtService.generateToken(user.get().getId(), user.get().getRole());
+            String token = jwtService.generateToken(user.get().getEmail(), user.get().getRole().toString());
 
             LoginResponseDto response = new LoginResponseDto();
             response.setToken(token);
             response.setName(user.get().getName());
             response.setEmail(user.get().getEmail());
-            response.setUserRole(user.get().getRole());
+            response.setUserRole(user.get().getRole().toString());
 
             return ResponseEntity.ok(response);
         } catch (BadCredentialsException ex){
