@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -68,23 +69,43 @@ public class AuthController {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
 
-            User user = userRepo.findUserByEmail(request.getEmail().toLowerCase());
-            if (user == null) {
+            Optional<User> user = userRepo.findUserByEmail(request.getEmail().toLowerCase());
+            if (user.isEmpty()) {
                 throw new UsernameNotFoundException("User Not Found!");
             }
 
-            String token = jwtService.generateToken(user.getEmail(), user.getRole().toString());
+            String token = jwtService.generateToken(user.get().getEmail(), user.get().getRole().toString());
+
+            user.get().setActiveFlg(true);
+            userRepo.save(user.get());
 
             LoginResponseDto response = new LoginResponseDto();
             response.setToken(token);
-            response.setName(user.getName());
-            response.setEmail(user.getEmail());
-            response.setUserRole(user.getRole().toString());
+            response.setName(user.get().getName());
+            response.setEmail(user.get().getEmail());
+            response.setUserRole(user.get().getRole().toString());
 
             return ResponseEntity.ok(response);
         } catch (BadCredentialsException ex){
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid Credentials"));
 
+        }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout() {
+        try {
+            Long currentUserId = com.shiwans.tolunity.Util.SecurityUtil.getCurrentUserId();
+            if (currentUserId != null) {
+                User user = userRepo.findById(currentUserId).orElse(null);
+                if (user != null) {
+                    user.setActiveFlg(false);
+                    userRepo.save(user);
+                }
+            }
+            return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Logout failed"));
         }
     }
 }

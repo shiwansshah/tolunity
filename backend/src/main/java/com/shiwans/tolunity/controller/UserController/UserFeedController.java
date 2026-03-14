@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/feed")
 @RequiredArgsConstructor
@@ -46,5 +47,15 @@ public class UserFeedController {
     @PostMapping("/likePost/{postId}")
     public ResponseEntity<?> likePost(@PathVariable Long postId) {
         return feedService.toggleLike(postId);
+    }
+
+    @PostMapping("/comment/{postId}")
+    public ResponseEntity<?> createComment(@PathVariable Long postId, @RequestBody Map<String, String> request) {
+        return feedService.createComment(postId, request.get("content"));
+    }
+
+    @GetMapping("/comments/{postId}")
+    public ResponseEntity<?> getPostComments(@PathVariable Long postId) {
+        return feedService.getPostComments(postId);
     }
 }

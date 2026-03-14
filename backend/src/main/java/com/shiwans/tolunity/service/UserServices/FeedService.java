@@ -8,6 +8,7 @@ import com.shiwans.tolunity.Repo.UserRepository;
 import com.shiwans.tolunity.Util.SecurityUtil;
 import com.shiwans.tolunity.dto.UserDTOs.CreatePostRequest;
 import com.shiwans.tolunity.dto.UserDTOs.FeedPostsResponse;
+import com.shiwans.tolunity.dto.UserDTOs.PostCommentResponse;
 import com.shiwans.tolunity.entities.User;
 import com.shiwans.tolunity.entities.UserEntities.UserFeed.Post;
 import com.shiwans.tolunity.entities.UserEntities.UserFeed.PostComment;
@@ -22,6 +23,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.w3c.dom.stylesheets.MediaList;
 
 import java.util.HashMap;
@@ -46,7 +48,8 @@ public class FeedService {
 
     @Autowired
     private PostCommentRepository postCommentRepository;
-
+    
+    @Transactional
     public ResponseEntity<?> createPost(CreatePostRequest request) {
         try {
             if(request.getContent() == null || request.getContent().isEmpty()) {
@@ -90,12 +93,14 @@ public class FeedService {
         }
     }
 
+    @Transactional
     public ResponseEntity<?> editPost(Long postId, CreatePostRequest request) {
 
         try {
 
-            if (request.getContent() == null || request.getContent().isEmpty()) {
-                throw new Exception("Post content cannot be empty");
+            if ((request.getContent() == null || request.getContent().trim().isEmpty()) 
+                && (request.getMediaList() == null || request.getMediaList().isEmpty())) {
+                throw new Exception("Post must contain text or media");
             }
 
             User user = userRepository.findUserById(SecurityUtil.getCurrentUserId());
@@ -154,6 +159,7 @@ public class FeedService {
         }
     }
 
+    @Transactional
     public ResponseEntity<?> deletePost(Long postId) {
 
         try {
@@ -382,6 +388,27 @@ public class FeedService {
 
             return ResponseEntity.status(500)
                     .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    public ResponseEntity<?> getPostComments(Long postId) {
+        try {
+            List<PostComment> comments = postCommentRepository.findAllByPostIdAndDelFlgFalseOrderByCreatedAtDesc(postId);
+            
+            List<PostCommentResponse> response = comments.stream().map(comment -> 
+                PostCommentResponse.builder()
+                        .commentId(comment.getId())
+                        .content(comment.getPostComment())
+                        .username(comment.getUser().getName())
+                        .userProfilePic(comment.getUser().getProfilePic())
+                        .createdAt(comment.getCreatedAt())
+                        .build()
+            ).toList();
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
     }
 }

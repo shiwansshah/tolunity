@@ -8,7 +8,6 @@ import java.util.List;
 @Data
 public class CreatePostRequest {
 
-    @NotNull
     private String content;
     private List<CreatePostRequest.Media> mediaList;
 

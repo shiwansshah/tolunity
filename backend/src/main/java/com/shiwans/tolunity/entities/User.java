@@ -42,7 +42,7 @@ public class User {
     @NotBlank(message = "Email is required")
     private String email;
 
-    @Column(name = "profile_pic")
+    @Column(name = "profile_pic", columnDefinition = "LONGTEXT")
     private String profilePic; // URL or path to profile picture
 
     @Column(name = "user_role")

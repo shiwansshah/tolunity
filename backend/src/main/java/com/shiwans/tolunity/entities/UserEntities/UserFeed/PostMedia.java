@@ -21,7 +21,8 @@ public class PostMedia {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "media_url")
+    @Lob
+    @Column(name = "media_url", columnDefinition = "LONGTEXT")
     private String mediaUrl;
 
     @Column(name = "media_type")
