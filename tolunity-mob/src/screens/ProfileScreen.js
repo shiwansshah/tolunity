@@ -109,15 +109,15 @@ export default function ProfileScreen() {
   };
 
   const menuItems = [
-    { 
-      icon: 'person-outline', 
-      label: 'Edit Profile', 
-      action: () => router.push('/edit-profile') 
+    {
+      icon: 'person-outline',
+      label: 'Edit Profile',
+      action: () => router.push('/edit-profile')
     },
-    { 
-      icon: 'lock-open-outline', 
-      label: 'Change Password', 
-      action: () => router.push('/change-password') 
+    {
+      icon: 'lock-open-outline',
+      label: 'Change Password',
+      action: () => router.push('/change-password')
     },
     { icon: 'notifications-outline', label: 'Notifications', action: null },
     { icon: 'lock-closed-outline', label: 'Privacy & Security', action: null },
@@ -134,82 +134,82 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Profile</Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Profile</Text>
+        </View>
+
+        {/* Profile Card */}
+        <View style={styles.profileCard}>
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              {user?.profilePic ? (
+                <Image source={{ uri: user.profilePic }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarText}>
+                  {getInitials(user?.name)}
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity style={styles.editAvatarBtn} activeOpacity={0.8} onPress={handleEditPic}>
+              <Ionicons name="pencil" size={14} color="#FFF" />
+            </TouchableOpacity>
           </View>
 
-          {/* Profile Card */}
-          <View style={styles.profileCard}>
-            <View style={styles.avatarContainer}>
-              <View style={styles.avatar}>
-                {user?.profilePic ? (
-                  <Image source={{ uri: user.profilePic }} style={styles.avatarImage} />
-                ) : (
-                  <Text style={styles.avatarText}>
-                    {getInitials(user?.name)}
-                  </Text>
-                )}
+          <Text style={styles.userName}>{user?.name || 'community member'}</Text>
+          <Text style={styles.userEmail}>{user?.email || ''}</Text>
+
+          <View style={styles.roleBadge}>
+            <Ionicons
+              name={user?.userRole === 'ROLE_ADMIN' ? 'shield-checkmark' : 'people'}
+              size={12}
+              color={COLORS.primary}
+            />
+            <Text style={styles.roleText}>
+              {user?.userRole === 'ROLE_ADMIN' ? 'Administrator' : 'community member'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Menu Items */}
+        <View style={styles.menuCard}>
+          {menuItems.map((item, index) => (
+            <TouchableOpacity
+              key={item.label}
+              style={[
+                styles.menuItem,
+                index < menuItems.length - 1 && styles.menuItemBorder,
+              ]}
+              activeOpacity={0.7}
+              onPress={item.action}
+            >
+              <View style={styles.menuIconWrap}>
+                <Ionicons name={item.icon} size={20} color={COLORS.primary} />
               </View>
-              <TouchableOpacity style={styles.editAvatarBtn} activeOpacity={0.8} onPress={handleEditPic}>
-                <Ionicons name="pencil" size={14} color="#FFF" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.userName}>{user?.name || 'Community Member'}</Text>
-            <Text style={styles.userEmail}>{user?.email || ''}</Text>
-
-            <View style={styles.roleBadge}>
+              <Text style={styles.menuLabel}>{item.label}</Text>
               <Ionicons
-                name={user?.userRole === 'ROLE_ADMIN' ? 'shield-checkmark' : 'people'}
-                size={12}
-                color={COLORS.primary}
+                name="chevron-forward"
+                size={16}
+                color={COLORS.textMuted}
               />
-              <Text style={styles.roleText}>
-                {user?.userRole === 'ROLE_ADMIN' ? 'Administrator' : 'Community Member'}
-              </Text>
-            </View>
-          </View>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-          {/* Menu Items */}
-          <View style={styles.menuCard}>
-            {menuItems.map((item, index) => (
-              <TouchableOpacity
-                key={item.label}
-                style={[
-                  styles.menuItem,
-                  index < menuItems.length - 1 && styles.menuItemBorder,
-                ]}
-                activeOpacity={0.7}
-                onPress={item.action}
-              >
-                <View style={styles.menuIconWrap}>
-                  <Ionicons name={item.icon} size={20} color={COLORS.primary} />
-                </View>
-                <Text style={styles.menuLabel}>{item.label}</Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={COLORS.textMuted}
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
+        {/* Logout Button */}
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={handleLogout}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
+          <Text style={styles.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
 
-          {/* Logout Button */}
-          <TouchableOpacity
-            style={styles.logoutBtn}
-            onPress={handleLogout}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
-            <Text style={styles.logoutText}>Sign Out</Text>
-          </TouchableOpacity>
-
-          {/* App version */}
-          <Text style={styles.version}>TolUnity v1.0.0</Text>
-        </ScrollView>
-      </SafeAreaView>
+        {/* App version */}
+        <Text style={styles.version}>TolUnity v1.0.0</Text>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

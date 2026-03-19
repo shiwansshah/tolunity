@@ -2,6 +2,7 @@ package com.shiwans.tolunity.entities;
 
 
 import com.shiwans.tolunity.enums.UserRolesEnum;
+import com.shiwans.tolunity.enums.UserTypeEnum;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -48,6 +49,10 @@ public class User {
     @Column(name = "user_role")
     @Enumerated(EnumType.STRING)
     private UserRolesEnum role;       //ROLE_USER, ROLE_ADMIN
+
+    @Column(name= "user_type")
+    @Enumerated(EnumType.STRING)
+    private UserTypeEnum userType;
 
     @Column(name = "active_flg")
     private boolean activeFlg = true;
