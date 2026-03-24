@@ -1,15 +1,16 @@
-package com.shiwans.tolunity.service;
+package com.shiwans.tolunity.service.UserServices;
 
-import com.shiwans.tolunity.Repo.CharityDonationRepository;
-import com.shiwans.tolunity.Repo.PaymentRepository;
+import com.shiwans.tolunity.Repo.AdminRepos.CharityDonationRepository;
+import com.shiwans.tolunity.Repo.UserRepos.PaymentRepository;
 import com.shiwans.tolunity.Repo.UserRepository;
 import com.shiwans.tolunity.Util.SecurityUtil;
 import com.shiwans.tolunity.config.AccessDeniedException;
 import com.shiwans.tolunity.config.ResourceNotFoundException;
-import com.shiwans.tolunity.entities.CharityDonation;
-import com.shiwans.tolunity.entities.Payment;
+import com.shiwans.tolunity.entities.Payments.CharityDonation;
+import com.shiwans.tolunity.entities.Payments.Payment;
 import com.shiwans.tolunity.entities.User;
 import com.shiwans.tolunity.enums.UserTypeEnum;
+import com.shiwans.tolunity.service.PaymentDtoMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;

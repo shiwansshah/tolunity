@@ -2,7 +2,7 @@ package com.shiwans.tolunity.service;
 
 import com.shiwans.tolunity.Repo.UserRepository;
 import com.shiwans.tolunity.dto.PaymentDto;
-import com.shiwans.tolunity.entities.Payment;
+import com.shiwans.tolunity.entities.Payments.Payment;
 import com.shiwans.tolunity.entities.User;
 import org.springframework.stereotype.Component;
 

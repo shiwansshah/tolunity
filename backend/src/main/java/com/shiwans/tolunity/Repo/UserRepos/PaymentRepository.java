@@ -1,6 +1,6 @@
-package com.shiwans.tolunity.Repo;
+package com.shiwans.tolunity.Repo.UserRepos;
 
-import com.shiwans.tolunity.entities.Payment;
+import com.shiwans.tolunity.entities.Payments.Payment;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

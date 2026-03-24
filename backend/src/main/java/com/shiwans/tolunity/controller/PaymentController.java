@@ -1,6 +1,6 @@
 package com.shiwans.tolunity.controller;
 
-import com.shiwans.tolunity.service.PaymentService;
+import com.shiwans.tolunity.service.UserServices.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

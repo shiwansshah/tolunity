@@ -1,6 +1,6 @@
 package com.shiwans.tolunity.controller.UserController;
 
-import com.shiwans.tolunity.service.TenantOwnerService;
+import com.shiwans.tolunity.service.UserServices.TenantOwnerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

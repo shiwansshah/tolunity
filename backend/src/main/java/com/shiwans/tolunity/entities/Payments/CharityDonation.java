@@ -1,4 +1,4 @@
-package com.shiwans.tolunity.entities;
+package com.shiwans.tolunity.entities.Payments;
 
 import jakarta.persistence.*;
 import lombok.*;

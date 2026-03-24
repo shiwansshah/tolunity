@@ -1,6 +1,6 @@
-package com.shiwans.tolunity.Repo;
+package com.shiwans.tolunity.Repo.AdminRepos;
 
-import com.shiwans.tolunity.entities.FeeConfig;
+import com.shiwans.tolunity.entities.Payments.FeeConfig;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

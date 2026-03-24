@@ -1,6 +1,6 @@
 package com.shiwans.tolunity.controller.AdminController;
 
-import com.shiwans.tolunity.service.AdminService;
+import com.shiwans.tolunity.service.AdminServices.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

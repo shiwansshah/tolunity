@@ -1,4 +1,4 @@
-package com.shiwans.tolunity.service;
+package com.shiwans.tolunity.service.UserServices;
 
 import com.shiwans.tolunity.Repo.UserRepository;
 import com.shiwans.tolunity.Util.SecurityUtil;
