@@ -60,6 +60,9 @@ public class User {
     @Column(name = "del_flg")
     private boolean delFlg = false;
 
+    @Column(name = "owner_id")
+    private Long ownerId; // For TENANT to select their OWNER
+
     @CreationTimestamp
     private Date createdAt;
 

@@ -11,11 +11,39 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { registerUser } from '../api/authApi';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+
+const USER_TYPES = [
+  {
+    key: 'OWNER',
+    label: 'Owner',
+    icon: 'home',
+    desc: 'I own a property in this community',
+    color: '#1E3FA0',
+    bgColor: '#EEF2FF',
+  },
+  {
+    key: 'TENANT',
+    label: 'Tenant',
+    icon: 'key',
+    desc: 'I rent a property in this community',
+    color: '#2ECC71',
+    bgColor: '#E8FFF0',
+  },
+  {
+    key: 'SECURITY',
+    label: 'Security',
+    icon: 'shield-checkmark',
+    desc: 'I work as security for this community',
+    color: '#F39C12',
+    bgColor: '#FFF9E6',
+  },
+];
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -25,6 +53,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [userType, setUserType] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
@@ -38,6 +67,7 @@ export default function RegisterScreen() {
     else if (password.length < 6) newErrors.password = 'Password must be at least 6 characters';
     if (!confirmPassword) newErrors.confirmPassword = 'Please confirm your password';
     else if (password !== confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+    if (!userType) newErrors.userType = 'Please select your account type';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -51,6 +81,7 @@ export default function RegisterScreen() {
         email: email.trim().toLowerCase(),
         password,
         phoneNumber: username.trim(), // username stored in phoneNumber for now
+        userType2: userType,
       });
       Alert.alert(
         'Account Created! 🎉',
@@ -99,6 +130,60 @@ export default function RegisterScreen() {
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Create Account</Text>
             <Text style={styles.cardSubtitle}>Join your community platform</Text>
+
+            {/* User Type Selector */}
+            <Text style={styles.sectionLabel}>I am a...</Text>
+            <View style={styles.userTypeRow}>
+              {USER_TYPES.map((type) => {
+                const isSelected = userType === type.key;
+                return (
+                  <TouchableOpacity
+                    key={type.key}
+                    style={[
+                      styles.userTypeCard,
+                      isSelected && { borderColor: type.color, backgroundColor: type.bgColor },
+                    ]}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setUserType(type.key);
+                      if (errors.userType) setErrors((e) => ({ ...e, userType: null }));
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.userTypeIconWrap,
+                        { backgroundColor: isSelected ? type.color : COLORS.bgInputBorder },
+                      ]}
+                    >
+                      <Ionicons
+                        name={type.icon}
+                        size={20}
+                        color={isSelected ? '#FFF' : COLORS.textMuted}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        styles.userTypeLabel,
+                        isSelected && { color: type.color, fontWeight: '800' },
+                      ]}
+                    >
+                      {type.label}
+                    </Text>
+                    <Text style={styles.userTypeDesc} numberOfLines={2}>
+                      {type.desc}
+                    </Text>
+                    {isSelected && (
+                      <View style={[styles.checkCircle, { backgroundColor: type.color }]}>
+                        <Ionicons name="checkmark" size={12} color="#FFF" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {errors.userType && (
+              <Text style={styles.errorText}>{errors.userType}</Text>
+            )}
 
             {/* Full Name */}
             <InputField
@@ -243,7 +328,64 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
     textAlign: 'center',
-    marginBottom: SPACING.xxl,
+    marginBottom: SPACING.lg,
+  },
+  sectionLabel: {
+    fontSize: FONTS.sizes.sm,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
+  },
+  userTypeRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
+  },
+  userTypeCard: {
+    flex: 1,
+    borderRadius: RADIUS.lg,
+    borderWidth: 2,
+    borderColor: COLORS.bgInputBorder,
+    backgroundColor: COLORS.bgInput,
+    padding: SPACING.md,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  userTypeIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.sm,
+  },
+  userTypeLabel: {
+    fontSize: FONTS.sizes.sm,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 2,
+  },
+  userTypeDesc: {
+    fontSize: 9,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 12,
+  },
+  checkCircle: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorText: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.error,
+    marginTop: -SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   createBtn: {
     width: '100%',

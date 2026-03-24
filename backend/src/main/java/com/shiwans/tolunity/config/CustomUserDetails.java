@@ -2,10 +2,12 @@ package com.shiwans.tolunity.config;
 
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 
 public class CustomUserDetails implements UserDetails {
 
@@ -13,16 +15,23 @@ public class CustomUserDetails implements UserDetails {
     private final Long id;
     private final String email;
     private final String password;
+    private final String role;
+    private final boolean deleted;
 
-    public CustomUserDetails(Long id, String email, String password) {
+    public CustomUserDetails(Long id, String email, String password, String role, boolean deleted) {
         this.id = id;
         this.email = email;
         this.password = password;
+        this.role = role;
+        this.deleted = deleted;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.emptyList(); // add roles here if needed
+        if (role == null || role.isBlank()) {
+            return Collections.emptyList();
+        }
+        return List.of(new SimpleGrantedAuthority(role));
     }
 
     @Override
@@ -52,6 +61,6 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return !deleted;
     }
 }

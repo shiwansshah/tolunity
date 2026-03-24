@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../src/context/AuthContext';
 import { COLORS, FONTS, SPACING, SHADOWS } from '../../src/styles/theme';
 
 function TabBarIcon({ name, color, focused }) {
@@ -16,6 +17,9 @@ function TabBarIcon({ name, color, focused }) {
 }
 
 export default function TabsLayout() {
+  const { user } = useAuth();
+  const isSecurity = user?.userType === 'SECURITY';
+
   return (
     <Tabs
       screenOptions={{
@@ -49,6 +53,8 @@ export default function TabsLayout() {
         name="payments"
         options={{
           title: 'Payments',
+          // Hide payments tab for SECURITY users
+          href: isSecurity ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <TabBarIcon name="card" focused={focused} />
           ),

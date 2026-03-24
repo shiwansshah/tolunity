@@ -1,0 +1,47 @@
+.charity-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.charity-total-card,
+.charity-count-card {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.75rem;
+}
+
+.charity-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, #E11D48, #F43F5E);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 16px rgba(225, 29, 72, 0.3);
+}
+
+.charity-icon-alt {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-lg);
+  background: rgba(79, 70, 229, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.charity-amount {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #E11D48;
+}
+
+.charity-number {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--text-main);
+}

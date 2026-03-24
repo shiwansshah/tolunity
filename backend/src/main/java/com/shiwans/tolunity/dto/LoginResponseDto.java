@@ -8,4 +8,5 @@ public class LoginResponseDto {
     private String name;
     private String email;
     private String userRole;
+    private String userType;
 }

@@ -159,15 +159,41 @@ export default function ProfileScreen() {
           <Text style={styles.userName}>{user?.name || 'community member'}</Text>
           <Text style={styles.userEmail}>{user?.email || ''}</Text>
 
-          <View style={styles.roleBadge}>
-            <Ionicons
-              name={user?.userRole === 'ROLE_ADMIN' ? 'shield-checkmark' : 'people'}
-              size={12}
-              color={COLORS.primary}
-            />
-            <Text style={styles.roleText}>
-              {user?.userRole === 'ROLE_ADMIN' ? 'Administrator' : 'community member'}
-            </Text>
+          <View style={{ flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.md }}>
+            {/* User Type Badge */}
+            {user?.userType && (
+              <View style={[styles.roleBadge, {
+                backgroundColor: user.userType === 'OWNER' ? '#EEF2FF' :
+                                 user.userType === 'TENANT' ? '#E8FFF0' : '#FFF9E6',
+              }]}>
+                <Ionicons
+                  name={user.userType === 'OWNER' ? 'home' :
+                        user.userType === 'TENANT' ? 'key' : 'shield-checkmark'}
+                  size={12}
+                  color={user.userType === 'OWNER' ? COLORS.primary :
+                         user.userType === 'TENANT' ? '#2ECC71' : '#F39C12'}
+                />
+                <Text style={[styles.roleText, {
+                  color: user.userType === 'OWNER' ? COLORS.primary :
+                         user.userType === 'TENANT' ? '#2ECC71' : '#F39C12',
+                }]}>
+                  {user.userType === 'OWNER' ? 'Owner' :
+                   user.userType === 'TENANT' ? 'Tenant' : 'Security'}
+                </Text>
+              </View>
+            )}
+
+            {/* Role Badge */}
+            <View style={styles.roleBadge}>
+              <Ionicons
+                name={user?.userRole === 'ROLE_ADMIN' ? 'shield-checkmark' : 'people'}
+                size={12}
+                color={COLORS.primary}
+              />
+              <Text style={styles.roleText}>
+                {user?.userRole === 'ROLE_ADMIN' ? 'Administrator' : 'Community Member'}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -291,7 +317,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.pill,
-    marginTop: SPACING.md,
     gap: SPACING.xs,
   },
   roleText: {
