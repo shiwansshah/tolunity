@@ -52,12 +52,14 @@ public class FeedService {
     @Transactional
     public ResponseEntity<?> createPost(CreatePostRequest request) {
         try {
-            if(request.getContent() == null || request.getContent().isEmpty()) {
-                throw new Exception("Post content cannot be empty");
+            boolean hasContent = request.getContent() != null && !request.getContent().trim().isEmpty();
+            boolean hasMedia = request.getMediaList() != null && !request.getMediaList().isEmpty();
+            if (!hasContent && !hasMedia) {
+                throw new IllegalArgumentException("Post must contain text or media");
             }
             Post post = new Post();
 
-            post.setPostContent(request.getContent());
+            post.setPostContent(hasContent ? request.getContent().trim() : null);
 
             User user = userRepository.findUserById(SecurityUtil.getCurrentUserId());
             post.setUser(user);
@@ -86,6 +88,8 @@ public class FeedService {
             Map<String, String> response = new HashMap<>();
             response.put("message", "Post created successfully");
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             Map<String, String> response = new HashMap<>();
             response.put("error", "Failed to create post: " + e.getMessage());
@@ -196,6 +200,7 @@ public class FeedService {
     }
 
 
+    @Transactional(readOnly = true)
     public ResponseEntity<?> getFeed(Pageable pageable) {
 
         try {
@@ -260,6 +265,7 @@ public class FeedService {
 
         return response;
     }
+    @Transactional
     public ResponseEntity<?> toggleLike(Long postId) {
 
         try {
@@ -318,9 +324,13 @@ public class FeedService {
         }
     }
 
+    @Transactional
     public ResponseEntity<?> createComment(Long postId, String content) {
 
         try {
+            if (content == null || content.trim().isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Comment content cannot be empty"));
+            }
 
             User user = userRepository.findUserById(SecurityUtil.getCurrentUserId());
             if(user == null){
@@ -331,7 +341,7 @@ public class FeedService {
                     .orElseThrow(() -> new RuntimeException("Post not found"));
 
             PostComment comment = new PostComment();
-            comment.setPostComment(content);
+            comment.setPostComment(content.trim());
             comment.setUser(user);   // who wrote the comment
             comment.setPost(post);
 
@@ -349,6 +359,7 @@ public class FeedService {
         }
     }
 
+    @Transactional
     public ResponseEntity<?> deleteComment(Long commentId) {
 
         try {
@@ -391,6 +402,7 @@ public class FeedService {
         }
     }
 
+    @Transactional(readOnly = true)
     public ResponseEntity<?> getPostComments(Long postId) {
         try {
             List<PostComment> comments = postCommentRepository.findAllByPostIdAndDelFlgFalseOrderByCreatedAtDesc(postId);

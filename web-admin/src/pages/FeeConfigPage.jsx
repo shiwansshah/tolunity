@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Settings, Wrench, Trash2, Send } from 'lucide-react';
 import { PageHeader, Card, Badge, Button } from '../components/UI';
 import api from '../services/api';
-import { Settings, Zap, Wrench, Trash2, Send } from 'lucide-react';
+import { getApiErrorMessage } from '../services/apiError';
 import './FeeConfigPage.css';
 
 const FEE_TYPES = [
   { key: 'MAINTENANCE', label: 'Maintenance Fee', icon: Wrench, color: '#F59E0B' },
-  { key: 'ELECTRICITY', label: 'Electricity Bill', icon: Zap, color: '#3B82F6' },
   { key: 'GARBAGE', label: 'Garbage Collection', icon: Trash2, color: '#10B981' },
 ];
 
@@ -20,25 +20,32 @@ const FeeConfigPage = () => {
 
   const fetchConfigs = async () => {
     try {
-      const res = await api.get('/admin/fee-config');
-      setConfigs(res.data);
-      // Populate form data from existing configs
-      const data = {};
-      res.data.forEach(c => {
-        data[c.feeType] = { amount: c.amount, intervalDays: c.intervalDays, description: c.description || '' };
+      const response = await api.get('/admin/fee-config');
+      setConfigs(response.data);
+
+      const nextFormData = {};
+      response.data.forEach((config) => {
+        nextFormData[config.feeType] = {
+          amount: config.amount,
+          intervalDays: config.intervalDays,
+          description: config.description || '',
+        };
       });
-      setFormData(data);
-    } catch (err) {
-      console.error('Failed to fetch fee configs', err);
+      setFormData(nextFormData);
+    } catch (error) {
+      console.error(getApiErrorMessage(error, 'Failed to fetch fee configs'));
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchConfigs(); }, []);
+  useEffect(() => {
+    fetchConfigs();
+  }, []);
 
   const handleSave = async (feeType) => {
     const data = formData[feeType];
+
     if (!data?.amount || data.amount <= 0) {
       setMessage({ type: 'error', text: 'Please enter a valid amount' });
       return;
@@ -49,64 +56,76 @@ const FeeConfigPage = () => {
       await api.post('/admin/fee-config', {
         feeType,
         amount: parseFloat(data.amount),
-        intervalDays: parseInt(data.intervalDays) || 30,
-        description: data.description
+        intervalDays: parseInt(data.intervalDays, 10) || 30,
+        description: data.description,
       });
-      setMessage({ type: 'success', text: `${feeType} fee config saved successfully!` });
+      setMessage({ type: 'success', text: `${feeType} fee config saved successfully` });
       fetchConfigs();
-    } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to save' });
+    } catch (error) {
+      setMessage({ type: 'error', text: getApiErrorMessage(error, 'Failed to save') });
     } finally {
       setSaving(null);
     }
   };
 
   const handleGenerate = async (feeType) => {
-    if (!window.confirm(`Generate ${feeType} bills for all eligible users?`)) return;
-    
+    if (!window.confirm(`Generate ${feeType} bills for all eligible users?`)) {
+      return;
+    }
+
     setGenerating(feeType);
     try {
-      const res = await api.post('/admin/generate-bills', { feeType });
-      setMessage({ type: 'success', text: res.data.message });
-    } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to generate bills' });
+      const response = await api.post('/admin/generate-bills', { feeType });
+      setMessage({ type: 'success', text: response.data.message });
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: getApiErrorMessage(error, 'Failed to generate bills'),
+      });
     } finally {
       setGenerating(null);
     }
   };
 
   const updateField = (feeType, field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [feeType]: { ...prev[feeType], [field]: value }
+    setFormData((currentFormData) => ({
+      ...currentFormData,
+      [feeType]: {
+        ...currentFormData[feeType],
+        [field]: value,
+      },
     }));
   };
 
-  if (loading) return <div className="p-8 text-center text-muted">Loading fee configurations...</div>;
+  if (loading) {
+    return <div className="p-8 text-center text-muted">Loading fee configurations...</div>;
+  }
 
   return (
     <div className="fade-in">
       <PageHeader
         title="Fee Configuration"
-        subtitle="Set amounts and intervals for system-managed fees collected by admin"
+        subtitle="Set amounts and intervals for maintenance and garbage fees managed by admin"
       />
 
       {message && (
         <div className={`alert-banner ${message.type === 'success' ? 'alert-success' : 'alert-error'}`}>
           {message.text}
-          <button onClick={() => setMessage(null)} className="alert-close">&times;</button>
+          <button onClick={() => setMessage(null)} className="alert-close">
+            &times;
+          </button>
         </div>
       )}
 
       <div className="fee-grid">
-        {FEE_TYPES.map(fee => {
+        {FEE_TYPES.map((fee) => {
           const data = formData[fee.key] || { amount: '', intervalDays: 30, description: '' };
-          const existingConfig = configs.find(c => c.feeType === fee.key);
+          const existingConfig = configs.find((config) => config.feeType === fee.key);
 
           return (
             <Card key={fee.key} className="fee-card">
               <div className="fee-header">
-                <div className="fee-icon" style={{ background: fee.color + '20', color: fee.color }}>
+                <div className="fee-icon" style={{ background: `${fee.color}20`, color: fee.color }}>
                   <fee.icon size={24} />
                 </div>
                 <div>
@@ -125,7 +144,7 @@ const FeeConfigPage = () => {
                   <input
                     type="number"
                     value={data.amount}
-                    onChange={e => updateField(fee.key, 'amount', e.target.value)}
+                    onChange={(event) => updateField(fee.key, 'amount', event.target.value)}
                     placeholder="e.g. 500"
                   />
                 </div>
@@ -134,7 +153,7 @@ const FeeConfigPage = () => {
                   <input
                     type="number"
                     value={data.intervalDays}
-                    onChange={e => updateField(fee.key, 'intervalDays', e.target.value)}
+                    onChange={(event) => updateField(fee.key, 'intervalDays', event.target.value)}
                     placeholder="30"
                   />
                 </div>
@@ -143,7 +162,7 @@ const FeeConfigPage = () => {
                   <input
                     type="text"
                     value={data.description}
-                    onChange={e => updateField(fee.key, 'description', e.target.value)}
+                    onChange={(event) => updateField(fee.key, 'description', event.target.value)}
                     placeholder="Optional note"
                   />
                 </div>
@@ -151,11 +170,17 @@ const FeeConfigPage = () => {
 
               <div className="fee-actions">
                 <Button onClick={() => handleSave(fee.key)} isLoading={saving === fee.key}>
-                  <Settings size={14} /> Save Config
+                  <Settings size={14} />
+                  Save Config
                 </Button>
                 {existingConfig && (
-                  <Button variant="secondary" onClick={() => handleGenerate(fee.key)} isLoading={generating === fee.key}>
-                    <Send size={14} /> Generate Bills
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleGenerate(fee.key)}
+                    isLoading={generating === fee.key}
+                  >
+                    <Send size={14} />
+                    Generate Bills
                   </Button>
                 )}
               </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,101 +12,175 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { MediaTypeOptions } from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { createComplaint, getComplaints, toggleComplaintUpvote } from '../api/complaintApi';
+import { getApiErrorMessage } from '../api/apiError';
 
-const MOCK_COMPLAINTS = [
-  {
-    id: '1', title: 'Stray Dogs Issue',
-    description: 'Multiple stray dogs near block C causing safety concerns for children.',
-    category: 'Safety', status: 'In Progress', date: 'Mar 12, 2026', priority: 'High',
-  },
-  {
-    id: '2', title: 'Garbage Collection Delay',
-    description: 'Garbage has not been collected for 3 days near unit 12.',
-    category: 'Sanitation', status: 'Open', date: 'Mar 10, 2026', priority: 'Medium',
-  },
-  {
-    id: '3', title: 'Street Light Repair',
-    description: 'The street light at the main gate has been broken for 2 weeks.',
-    category: 'Infrastructure', status: 'Resolved', date: 'Mar 5, 2026', priority: 'Low',
-  },
-];
-
-const STATUS_CONFIG = {
-  Open: { bg: '#FFF9E6', text: '#F39C12', icon: 'time-outline' },
-  'In Progress': { bg: '#EEF6FF', text: COLORS.primary, icon: 'refresh-outline' },
-  Resolved: { bg: '#E8FFF0', text: COLORS.success, icon: 'checkmark-circle-outline' },
+const CATEGORIES = ['Sanitation', 'Safety', 'Infrastructure', 'Noise', 'Water', 'Other'];
+const STATUS_COLORS = {
+  OPEN: { bg: '#FFF7E6', text: COLORS.warning },
+  UNDER_REVIEW: { bg: '#EEF2FF', text: COLORS.primary },
+  IN_PROGRESS: { bg: '#EEF2FF', text: COLORS.primary },
+  RESOLVED: { bg: '#E8FFF0', text: COLORS.success },
+  CLOSED: { bg: '#F5F7FB', text: COLORS.textMuted },
 };
 
-const PRIORITY_COLORS = {
-  High: COLORS.error,
-  Medium: COLORS.warning,
-  Low: COLORS.success,
-};
+const formatStatus = (status) =>
+  (status || 'OPEN')
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 
 export default function ComplaintsScreen() {
-  const [complaints, setComplaints] = useState(MOCK_COMPLAINTS);
+  const [complaints, setComplaints] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('Sanitation');
-  const [submitting, setSubmitting] = useState(false);
+  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [mediaAssets, setMediaAssets] = useState([]);
 
-  const categories = ['Sanitation', 'Safety', 'Infrastructure', 'Noise', 'Other'];
-
-  const handleSubmit = () => {
-    if (!title.trim() || !description.trim()) {
-      Alert.alert('Validation', 'Please fill in all fields');
-      return;
+  const loadComplaints = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await getComplaints();
+      setComplaints(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      Alert.alert('Load Failed', getApiErrorMessage(error, 'Unable to load complaints.'));
+      setComplaints([]);
+    } finally {
+      setLoading(false);
     }
-    setSubmitting(true);
-    setTimeout(() => {
-      const newComplaint = {
-        id: Date.now().toString(),
+  }, []);
+
+  useEffect(() => {
+    loadComplaints();
+  }, [loadComplaints]);
+
+  const pickMedia = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      return Alert.alert('Permission Required', 'Media permission is required to attach photos or videos.');
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: MediaTypeOptions.All,
+      allowsMultipleSelection: true,
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (!result.canceled) {
+      setMediaAssets((current) => [...current, ...result.assets]);
+    }
+  };
+
+  const submitComplaint = async () => {
+    if (!title.trim() || !description.trim()) {
+      return Alert.alert('Validation', 'Title and description are required.');
+    }
+
+    setSaving(true);
+    try {
+      const mediaList = mediaAssets.map((asset) => {
+        const extension = asset.uri.split('.').pop();
+        const isVideo = asset.type === 'video';
+        return {
+          mediaType: isVideo ? 'VIDEO' : 'IMAGE',
+          mediaUrl: asset.base64
+            ? `data:${isVideo ? 'video' : 'image'}/${extension};base64,${asset.base64}`
+            : asset.uri,
+        };
+      });
+
+      await createComplaint({
         title: title.trim(),
         description: description.trim(),
         category,
-        status: 'Open',
-        date: 'Today',
-        priority: 'Medium',
-      };
-      setComplaints((prev) => [newComplaint, ...prev]);
+        mediaList,
+      });
+
       setTitle('');
       setDescription('');
-      setCategory('Sanitation');
+      setCategory(CATEGORIES[0]);
+      setMediaAssets([]);
       setModalVisible(false);
-      setSubmitting(false);
-      Alert.alert('Submitted! ✅', 'Your complaint has been registered.');
-    }, 1000);
+      loadComplaints();
+      Alert.alert('Complaint Submitted', 'Your complaint is now visible to the community and admin.');
+    } catch (error) {
+      Alert.alert('Submit Failed', getApiErrorMessage(error, 'Unable to submit complaint.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const upvote = async (complaintId) => {
+    try {
+      await toggleComplaintUpvote(complaintId);
+      loadComplaints();
+    } catch (error) {
+      Alert.alert('Upvote Failed', getApiErrorMessage(error, 'Unable to update upvote.'));
+    }
   };
 
   const renderComplaint = ({ item }) => {
-    const cfg = STATUS_CONFIG[item.status] || STATUS_CONFIG.Open;
+    const statusConfig = STATUS_COLORS[item.status] || STATUS_COLORS.OPEN;
     return (
       <View style={styles.card}>
-        <View style={styles.cardTop}>
-          <View style={styles.cardTopLeft}>
+        <View style={styles.rowBetween}>
+          <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>{item.title}</Text>
-            <View style={styles.metaRow}>
-              <View style={[styles.categoryTag, { backgroundColor: '#EEF2FF' }]}>
-                <Text style={styles.categoryText}>{item.category}</Text>
-              </View>
-              <View style={[styles.priorityDot, { backgroundColor: PRIORITY_COLORS[item.priority] }]} />
-              <Text style={[styles.priorityText, { color: PRIORITY_COLORS[item.priority] }]}>
-                {item.priority}
-              </Text>
-            </View>
+            <Text style={styles.cardMeta}>{item.category} • by {item.createdByName}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
-            <Ionicons name={cfg.icon} size={13} color={cfg.text} />
-            <Text style={[styles.statusText, { color: cfg.text }]}>{item.status}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
+            <Text style={[styles.statusText, { color: statusConfig.text }]}>{formatStatus(item.status)}</Text>
           </View>
         </View>
-        <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
-        <Text style={styles.date}>{item.date}</Text>
+
+        <Text style={styles.description}>{item.description}</Text>
+
+        {item.mediaList?.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SPACING.md }}>
+            {item.mediaList.map((media) => (
+              <View key={media.id} style={styles.mediaCard}>
+                {media.mediaType === 'IMAGE' ? (
+                  <Image source={{ uri: media.mediaUrl }} style={styles.mediaImage} />
+                ) : (
+                  <View style={styles.videoPlaceholder}>
+                    <Ionicons name="videocam" size={22} color="#FFF" />
+                    <Text style={styles.videoText}>Video</Text>
+                  </View>
+                )}
+              </View>
+            ))}
+          </ScrollView>
+        )}
+
+        <View style={styles.rowBetween}>
+          <TouchableOpacity style={[styles.voteBtn, item.upvotedByCurrentUser && styles.voteBtnActive]} onPress={() => upvote(item.id)}>
+            <Ionicons name={item.upvotedByCurrentUser ? 'arrow-up-circle' : 'arrow-up-circle-outline'} size={18} color={item.upvotedByCurrentUser ? '#FFF' : COLORS.primary} />
+            <Text style={[styles.voteText, item.upvotedByCurrentUser && styles.voteTextActive]}>{item.upvoteCount}</Text>
+          </TouchableOpacity>
+          <Text style={styles.cardMeta}>{item.updatedAt ? new Date(item.updatedAt).toLocaleString() : ''}</Text>
+        </View>
+
+        <View style={styles.followUpBox}>
+          <Text style={styles.followUpTitle}>Follow up contact</Text>
+          <Text style={styles.followUpText}>
+            {item.followUpContact?.name} • {item.followUpContact?.phoneNumber}
+          </Text>
+          <Text style={styles.followUpText}>{item.followUpContact?.email}</Text>
+          <Text style={styles.followUpText}>{item.resolutionNote || 'Awaiting admin review'}</Text>
+        </View>
       </View>
     );
   };
@@ -114,181 +188,140 @@ export default function ComplaintsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Complaints</Text>
-        </View>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Complaints</Text>
+      </View>
 
+      {loading ? (
+        <View style={styles.loader}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      ) : (
         <FlatList
           data={complaints}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => String(item.id)}
           renderItem={renderComplaint}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="flag-outline" size={48} color={COLORS.textMuted} />
-              <Text style={styles.emptyText}>No complaints yet</Text>
+              <Ionicons name="flag-outline" size={44} color={COLORS.textMuted} />
+              <Text style={styles.emptyText}>No complaints posted yet</Text>
             </View>
           }
         />
+      )}
 
-        {/* FAB */}
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => setModalVisible(true)}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="warning" size={24} color="#FFF" />
-        </TouchableOpacity>
+      <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
+        <Ionicons name="add" size={28} color="#FFF" />
+      </TouchableOpacity>
 
-        {/* New Complaint Modal */}
-        <Modal
-          visible={modalVisible}
-          animationType="slide"
-          transparent
-          onRequestClose={() => setModalVisible(false)}
-        >
-          <KeyboardAvoidingView
-            style={styles.modalOverlay}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          >
-            <View style={styles.modalCard}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>File a Complaint</Text>
-                <TouchableOpacity onPress={() => setModalVisible(false)}>
-                  <Ionicons name="close" size={24} color={COLORS.textSecondary} />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <Text style={styles.inputLabel}>Title</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Brief complaint title"
-                  placeholderTextColor={COLORS.textMuted}
-                  value={title}
-                  onChangeText={setTitle}
-                />
-
-                <Text style={styles.inputLabel}>Category</Text>
-                <View style={styles.categoryPicker}>
-                  {categories.map((cat) => (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[styles.catChip, category === cat && styles.catChipActive]}
-                      onPress={() => setCategory(cat)}
-                    >
-                      <Text style={[styles.catChipText, category === cat && styles.catChipTextActive]}>
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <Text style={styles.inputLabel}>Description</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="Describe the issue in detail…"
-                  placeholderTextColor={COLORS.textMuted}
-                  value={description}
-                  onChangeText={setDescription}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                />
-
-                <TouchableOpacity
-                  style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
-                  onPress={handleSubmit}
-                  disabled={submitting}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="send-outline" size={18} color="#FFF" />
-                  <Text style={styles.submitBtnText}>
-                    {submitting ? 'Submitting…' : 'Submit Complaint'}
-                  </Text>
-                </TouchableOpacity>
-              </ScrollView>
+      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.modalCard}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.modalTitle}>File Complaint</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.textMuted} />
+              </TouchableOpacity>
             </View>
-          </KeyboardAvoidingView>
-        </Modal>
-      </SafeAreaView>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <TextInput
+                style={styles.input}
+                placeholder="Complaint title"
+                placeholderTextColor={COLORS.textMuted}
+                value={title}
+                onChangeText={setTitle}
+              />
+              <View style={styles.chips}>
+                {CATEGORIES.map((item) => (
+                  <TouchableOpacity key={item} style={[styles.chip, category === item && styles.chipActive]} onPress={() => setCategory(item)}>
+                    <Text style={[styles.chipText, category === item && styles.chipTextActive]}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Describe the issue"
+                placeholderTextColor={COLORS.textMuted}
+                value={description}
+                onChangeText={setDescription}
+                multiline
+              />
+
+              {mediaAssets.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SPACING.md }}>
+                  {mediaAssets.map((asset, index) => (
+                    <View key={`${asset.uri}-${index}`} style={styles.mediaCard}>
+                      {asset.type === 'video' ? (
+                        <View style={styles.videoPlaceholder}>
+                          <Ionicons name="videocam" size={22} color="#FFF" />
+                          <Text style={styles.videoText}>Video</Text>
+                        </View>
+                      ) : (
+                        <Image source={{ uri: asset.uri }} style={styles.mediaImage} />
+                      )}
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+
+              <TouchableOpacity style={styles.attachBtn} onPress={pickMedia}>
+                <Ionicons name="images-outline" size={18} color={COLORS.primary} />
+                <Text style={styles.attachBtnText}>Attach Photos / Videos</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.submitBtn} onPress={submitComplaint} disabled={saving}>
+                {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitBtnText}>Submit Complaint</Text>}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.feedBg },
-  header: {
-    backgroundColor: COLORS.primary, paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md, ...SHADOWS.header,
-  },
-  headerTitle: { fontSize: FONTS.sizes.xl, fontWeight: '800', color: '#FFF' },
+  header: { backgroundColor: COLORS.primary, padding: SPACING.lg, ...SHADOWS.header },
+  headerTitle: { color: '#FFF', fontSize: FONTS.sizes.xl, fontWeight: '800' },
   listContent: { padding: SPACING.lg, paddingBottom: 100 },
-  card: {
-    backgroundColor: COLORS.bgCard, borderRadius: RADIUS.lg,
-    padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOWS.card,
-  },
-  cardTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: SPACING.sm },
-  cardTopLeft: { flex: 1 },
-  cardTitle: { fontSize: FONTS.sizes.md, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 6 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  categoryTag: { paddingHorizontal: SPACING.sm, paddingVertical: 3, borderRadius: RADIUS.pill },
-  categoryText: { fontSize: FONTS.sizes.xs, fontWeight: '600', color: COLORS.primary },
-  priorityDot: { width: 6, height: 6, borderRadius: 3 },
-  priorityText: { fontSize: FONTS.sizes.xs, fontWeight: '700' },
-  statusBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: SPACING.sm, paddingVertical: 4, borderRadius: RADIUS.pill, marginLeft: SPACING.sm,
-  },
-  statusText: { fontSize: 10, fontWeight: '700' },
-  description: { fontSize: FONTS.sizes.sm, color: COLORS.textSecondary, lineHeight: 20, marginBottom: SPACING.sm },
-  date: { fontSize: FONTS.sizes.xs, color: COLORS.textMuted },
-  fab: {
-    position: 'absolute', right: SPACING.xl, bottom: SPACING.xl,
-    width: 58, height: 58, borderRadius: 29,
-    backgroundColor: COLORS.fabRed,
-    alignItems: 'center', justifyContent: 'center',
-    ...SHADOWS.button,
-  },
-  empty: { alignItems: 'center', paddingVertical: SPACING.xxxl * 2 },
-  emptyText: { marginTop: SPACING.md, fontSize: FONTS.sizes.md, color: COLORS.textSecondary },
-
-  // Modal
-  modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: COLORS.bgCard, borderTopLeftRadius: RADIUS.xxl,
-    borderTopRightRadius: RADIUS.xxl, padding: SPACING.xxl,
-    maxHeight: '85%',
-  },
-  modalHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: SPACING.xl,
-  },
+  loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  card: { backgroundColor: COLORS.bgCard, borderRadius: RADIUS.lg, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOWS.card },
+  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardTitle: { fontSize: FONTS.sizes.md, fontWeight: '800', color: COLORS.textPrimary },
+  cardMeta: { marginTop: 4, color: COLORS.textMuted, fontSize: FONTS.sizes.xs },
+  description: { marginTop: SPACING.md, marginBottom: SPACING.md, color: COLORS.textSecondary, lineHeight: 20 },
+  statusBadge: { borderRadius: RADIUS.pill, paddingHorizontal: SPACING.sm, paddingVertical: 5, marginLeft: SPACING.sm },
+  statusText: { fontSize: 10, fontWeight: '800' },
+  mediaCard: { width: 90, height: 90, borderRadius: RADIUS.md, overflow: 'hidden', marginRight: SPACING.sm, backgroundColor: '#000' },
+  mediaImage: { width: '100%', height: '100%' },
+  videoPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary },
+  videoText: { color: '#FFF', fontSize: FONTS.sizes.xs, marginTop: 4 },
+  voteBtn: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary, borderRadius: RADIUS.pill, paddingHorizontal: SPACING.md, paddingVertical: 6, gap: SPACING.xs },
+  voteBtnActive: { backgroundColor: COLORS.primary },
+  voteText: { color: COLORS.primary, fontWeight: '800' },
+  voteTextActive: { color: '#FFF' },
+  followUpBox: { marginTop: SPACING.md, paddingTop: SPACING.md, borderTopWidth: 1, borderTopColor: COLORS.cardBorder },
+  followUpTitle: { fontSize: FONTS.sizes.sm, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 4 },
+  followUpText: { color: COLORS.textSecondary, fontSize: FONTS.sizes.xs, lineHeight: 18 },
+  empty: { alignItems: 'center', paddingTop: SPACING.xxxl * 2 },
+  emptyText: { marginTop: SPACING.md, color: COLORS.textSecondary },
+  fab: { position: 'absolute', right: SPACING.xl, bottom: SPACING.xl, width: 58, height: 58, borderRadius: 29, backgroundColor: COLORS.fabRed, alignItems: 'center', justifyContent: 'center', ...SHADOWS.button },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalCard: { backgroundColor: COLORS.bgCard, borderTopLeftRadius: RADIUS.xxl, borderTopRightRadius: RADIUS.xxl, padding: SPACING.xxl, maxHeight: '88%' },
   modalTitle: { fontSize: FONTS.sizes.xl, fontWeight: '800', color: COLORS.textPrimary },
-  inputLabel: { fontSize: FONTS.sizes.sm, fontWeight: '600', color: COLORS.textPrimary, marginBottom: SPACING.sm },
-  input: {
-    backgroundColor: COLORS.bgInput, borderWidth: 1.5, borderColor: COLORS.bgInputBorder,
-    borderRadius: RADIUS.md, paddingHorizontal: SPACING.md, paddingVertical: SPACING.md,
-    fontSize: FONTS.sizes.md, color: COLORS.textPrimary, marginBottom: SPACING.lg,
-  },
-  textArea: { height: 100, textAlignVertical: 'top' },
-  categoryPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.lg },
-  catChip: {
-    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.pill, backgroundColor: COLORS.bgInput, borderWidth: 1, borderColor: COLORS.bgInputBorder,
-  },
-  catChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  catChipText: { fontSize: FONTS.sizes.sm, fontWeight: '600', color: COLORS.textSecondary },
-  catChipTextActive: { color: '#FFF' },
-  submitBtn: {
-    backgroundColor: COLORS.primary, borderRadius: RADIUS.xl,
-    paddingVertical: SPACING.lg, flexDirection: 'row',
-    alignItems: 'center', justifyContent: 'center', gap: SPACING.sm,
-    ...SHADOWS.button, marginTop: SPACING.sm,
-  },
-  submitBtnDisabled: { opacity: 0.6 },
-  submitBtnText: { color: '#FFF', fontSize: FONTS.sizes.md, fontWeight: '700' },
+  input: { backgroundColor: COLORS.bgInput, borderWidth: 1, borderColor: COLORS.bgInputBorder, borderRadius: RADIUS.md, padding: SPACING.md, color: COLORS.textPrimary, marginTop: SPACING.lg, marginBottom: SPACING.md },
+  textArea: { minHeight: 110, textAlignVertical: 'top' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.md },
+  chip: { backgroundColor: COLORS.bgInput, borderWidth: 1, borderColor: COLORS.bgInputBorder, borderRadius: RADIUS.pill, paddingHorizontal: SPACING.md, paddingVertical: 8 },
+  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  chipText: { color: COLORS.textSecondary, fontWeight: '700', fontSize: FONTS.sizes.xs },
+  chipTextActive: { color: '#FFF' },
+  attachBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, borderWidth: 1, borderColor: COLORS.primary, borderRadius: RADIUS.md, paddingVertical: SPACING.md, marginBottom: SPACING.md },
+  attachBtnText: { color: COLORS.primary, fontWeight: '700' },
+  submitBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: SPACING.lg, alignItems: 'center' },
+  submitBtnText: { color: '#FFF', fontWeight: '800', fontSize: FONTS.sizes.md },
 });

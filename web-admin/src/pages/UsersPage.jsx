@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { ShieldAlert, ShieldCheck, Mail, Phone, TriangleAlert } from 'lucide-react';
 import { PageHeader, Card, Badge, Button } from '../components/UI';
 import api from '../services/api';
-import { ShieldAlert, ShieldCheck, Mail, Phone } from 'lucide-react';
+import { getApiErrorMessage } from '../services/apiError';
 
 const UsersPage = () => {
   const [users, setUsers] = useState([]);
@@ -12,8 +13,8 @@ const UsersPage = () => {
     try {
       const response = await api.get('/admin/users');
       setUsers(response.data);
-    } catch (err) {
-      setError('Failed to load users');
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Failed to load users'));
     } finally {
       setLoading(false);
     }
@@ -26,18 +27,27 @@ const UsersPage = () => {
   const handleToggleStatus = async (id) => {
     try {
       await api.put(`/admin/users/${id}/status`);
-      setUsers(users.map(u => u.id === id ? { ...u, activeFlg: !u.activeFlg } : u));
-    } catch (err) {
-      alert('Failed to update user status');
+      setUsers((currentUsers) =>
+        currentUsers.map((user) =>
+          user.id === id ? { ...user, activeFlg: !user.activeFlg } : user
+        )
+      );
+    } catch (error) {
+      alert(getApiErrorMessage(error, 'Failed to update user status'));
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-muted">Loading user data...</div>;
+  if (loading) {
+    return <div className="p-8 text-center text-muted">Loading user data...</div>;
+  }
 
   return (
     <div className="fade-in">
-      <PageHeader title="User Management" subtitle="View and manage system access for all registered users" />
-      
+      <PageHeader
+        title="User Management"
+        subtitle="View and manage system access for all registered users"
+      />
+
       {error && <div className="error-banner">{error}</div>}
 
       <Card>
@@ -53,12 +63,12 @@ const UsersPage = () => {
               </tr>
             </thead>
             <tbody>
-              {users.map(user => (
+              {users.map((user) => (
                 <tr key={user.id} className={!user.activeFlg ? 'row-disabled' : ''}>
                   <td>
                     <div className="font-bold flex items-center gap-2">
-                       {user.delFlg && <span title="Deleted" style={{color: 'red'}}>⚠️</span>}
-                       {user.name}
+                      {user.delFlg && <TriangleAlert size={14} color="red" />}
+                      {user.name}
                     </div>
                   </td>
                   <td>
@@ -71,8 +81,14 @@ const UsersPage = () => {
                   </td>
                   <td>
                     <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2 text-sm"><Mail size={14} className="text-muted"/> {user.email}</div>
-                      <div className="flex items-center gap-2 text-sm"><Phone size={14} className="text-muted"/> {user.phoneNumber}</div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Mail size={14} className="text-muted" />
+                        {user.email}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone size={14} className="text-muted" />
+                        {user.phoneNumber}
+                      </div>
                     </div>
                   </td>
                   <td>
@@ -81,18 +97,32 @@ const UsersPage = () => {
                     </Badge>
                   </td>
                   <td>
-                    <Button 
+                    <Button
                       variant={user.activeFlg ? 'danger' : 'success'}
                       onClick={() => handleToggleStatus(user.id)}
-                      disabled={user.role === 'ROLE_ADMIN'}
+                      disabled={user.role === 'ADMIN'}
                     >
-                      {user.activeFlg ? <><ShieldAlert size={14}/> Lock Access</> : <><ShieldCheck size={14}/> Unlock</>}
+                      {user.activeFlg ? (
+                        <>
+                          <ShieldAlert size={14} />
+                          Lock Access
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck size={14} />
+                          Unlock
+                        </>
+                      )}
                     </Button>
                   </td>
                 </tr>
               ))}
               {users.length === 0 && (
-                <tr><td colSpan="5" className="text-center py-8 text-muted">No users found</td></tr>
+                <tr>
+                  <td colSpan="5" className="text-center py-8 text-muted">
+                    No users found
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

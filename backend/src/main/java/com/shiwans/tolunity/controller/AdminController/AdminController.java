@@ -1,5 +1,7 @@
 package com.shiwans.tolunity.controller.AdminController;
 
+import com.shiwans.tolunity.dto.ComplaintDtos.UpdateComplaintStatusRequest;
+import com.shiwans.tolunity.service.ComplaintService;
 import com.shiwans.tolunity.service.AdminServices.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +16,7 @@ import java.util.Map;
 public class AdminController {
 
     private final AdminService adminService;
+    private final ComplaintService complaintService;
 
     @GetMapping("/dashboard")
     public ResponseEntity<?> getDashboardStats() {
@@ -53,5 +56,18 @@ public class AdminController {
     @GetMapping("/charity")
     public ResponseEntity<?> getCharityData() {
         return adminService.getCharityData();
+    }
+
+    @GetMapping("/complaints")
+    public ResponseEntity<?> getComplaints() {
+        return complaintService.getComplaintsForAdmins();
+    }
+
+    @PutMapping("/complaints/{complaintId}/status")
+    public ResponseEntity<?> updateComplaintStatus(
+            @PathVariable Long complaintId,
+            @RequestBody UpdateComplaintStatusRequest request
+    ) {
+        return complaintService.updateComplaintStatus(complaintId, request);
     }
 }

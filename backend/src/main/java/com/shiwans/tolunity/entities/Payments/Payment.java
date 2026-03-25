@@ -30,6 +30,18 @@ public class Payment {
 
     private Date paidDate;
 
+    @Column(name = "gateway_provider")
+    private String gatewayProvider;
+
+    @Column(name = "gateway_transaction_id")
+    private String gatewayTransactionId;
+
+    @Column(name = "gateway_reference_id")
+    private String gatewayReferenceId;
+
+    @Column(name = "gateway_status")
+    private String gatewayStatus;
+
     @Column(name = "interval_days")
     private Integer intervalDays; // Billing interval in days (e.g. 30 for monthly)
 

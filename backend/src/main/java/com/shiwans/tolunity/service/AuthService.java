@@ -56,10 +56,15 @@ public class AuthService {
 
     public ResponseEntity<?> login(UserLoginDto request) {
         try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+            String normalizedEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null;
+            if (normalizedEmail == null || normalizedEmail.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
+            }
 
-            Optional<User> user = userRepository.findUserByEmail(request.getEmail().toLowerCase());
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(normalizedEmail, request.getPassword()));
+
+            Optional<User> user = userRepository.findUserByEmail(normalizedEmail);
             if (user.isEmpty()) {
                 throw new UsernameNotFoundException("User Not Found!");
             }
@@ -74,7 +79,7 @@ public class AuthService {
             response.setToken(token);
             response.setName(authenticatedUser.getName());
             response.setEmail(authenticatedUser.getEmail());
-            response.setUserRole(authenticatedUser.getRole().toString());
+            response.setUserRole(normalizeRole(authenticatedUser.getRole()));
             response.setUserType(authenticatedUser.getUserType() != null ? authenticatedUser.getUserType().toString() : null);
 
             return ResponseEntity.ok(response);
@@ -110,10 +115,18 @@ public class AuthService {
         if ("TENANT".equalsIgnoreCase(requestedUserType)) {
             return UserTypeEnum.TENANT;
         }
-        if ("SECURITY".equalsIgnoreCase(requestedUserType)) {
-            return UserTypeEnum.SECURITY;
+
+        throw new IllegalArgumentException("userType must be OWNER or TENANT");
+    }
+
+    private String normalizeRole(UserRolesEnum role) {
+        if (role == null) {
+            return null;
         }
 
-        throw new IllegalArgumentException("userType must be OWNER, TENANT, or SECURITY");
+        return switch (role) {
+            case ROLE_ADMIN -> "ADMIN";
+            case ROLE_USER -> "USER";
+        };
     }
 }

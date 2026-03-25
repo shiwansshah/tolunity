@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
   RefreshControl,
-  StatusBar,
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
@@ -13,8 +12,10 @@ import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { getFeed } from '../api/feedApi';
+import { getApiErrorMessage } from '../api/apiError';
 import PostCard from '../components/PostCard';
-import { COLORS, FONTS, SPACING, SHADOWS } from '../styles/theme';
+import { FEED_PAGE_SIZE } from '../utils/constants';
+import { COLORS, FONTS, SPACING } from '../styles/theme';
 
 export default function FeedScreen() {
   const { user } = useAuth();
@@ -39,21 +40,21 @@ export default function FeedScreen() {
     }
 
     try {
-      const res = await getFeed(pageNum, 10);
-      const data = res.data;
-      const newPosts = data.content || [];
+      const response = await getFeed(pageNum, FEED_PAGE_SIZE);
+      const data = response.data;
+      const nextPosts = data.content || [];
 
       if (isRefresh || pageNum === 0) {
-        setPosts(newPosts);
+        setPosts(nextPosts);
         setPage(0);
       } else {
-        setPosts((prev) => [...prev, ...newPosts]);
+        setPosts((currentPosts) => [...currentPosts, ...nextPosts]);
       }
 
       setHasMore(!data.last);
-    } catch (err) {
-      console.error('Feed error:', err);
-      setError('Failed to load feed. Pull down to retry.');
+    } catch (error) {
+      console.error('Feed error:', error);
+      setError(getApiErrorMessage(error, 'Failed to load feed. Pull down to retry.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -80,13 +81,7 @@ export default function FeedScreen() {
     }
   };
 
-  const renderPost = ({ item }) => (
-    <PostCard
-      post={item}
-      reload={onRefresh}
-      currentUser={user}
-    />
-  );
+  const renderPost = ({ item }) => <PostCard post={item} reload={onRefresh} currentUser={user} />;
 
   const renderHeader = () => (
     <View style={styles.feedHeader}>
@@ -95,20 +90,24 @@ export default function FeedScreen() {
   );
 
   const renderEmpty = () => {
-    if (loading) return null;
+    if (loading) {
+      return null;
+    }
+
     return (
       <View style={styles.emptyContainer}>
         <Ionicons name="newspaper-outline" size={64} color={COLORS.textMuted} />
         <Text style={styles.emptyTitle}>No posts yet</Text>
-        <Text style={styles.emptySubtitle}>
-          Be the first to share something with your community!
-        </Text>
+        <Text style={styles.emptySubtitle}>Be the first to share something with your community.</Text>
       </View>
     );
   };
 
   const renderFooter = () => {
-    if (!loadingMore) return <View style={{ height: SPACING.xxl }} />;
+    if (!loadingMore) {
+      return <View style={{ height: SPACING.xxl }} />;
+    }
+
     return (
       <View style={styles.footerLoader}>
         <ActivityIndicator color={COLORS.primary} size="small" />
@@ -130,7 +129,7 @@ export default function FeedScreen() {
     return (
       <View style={styles.centerLoader}>
         <ActivityIndicator color={COLORS.primary} size="large" />
-        <Text style={styles.loadingText}>Loading community feed…</Text>
+        <Text style={styles.loadingText}>Loading community feed...</Text>
       </View>
     );
   }

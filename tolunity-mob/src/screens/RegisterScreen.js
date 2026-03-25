@@ -35,14 +35,6 @@ const USER_TYPES = [
     color: '#2ECC71',
     bgColor: '#E8FFF0',
   },
-  {
-    key: 'SECURITY',
-    label: 'Security',
-    icon: 'shield-checkmark',
-    desc: 'I work as security for this community',
-    color: '#F39C12',
-    bgColor: '#FFF9E6',
-  },
 ];
 
 export default function RegisterScreen() {
@@ -129,7 +121,7 @@ export default function RegisterScreen() {
           {/* Card */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Create Account</Text>
-            <Text style={styles.cardSubtitle}>Join your community platform</Text>
+            <Text style={styles.cardSubtitle}>Self-registration is available for owners and tenants only</Text>
 
             {/* User Type Selector */}
             <Text style={styles.sectionLabel}>I am a...</Text>

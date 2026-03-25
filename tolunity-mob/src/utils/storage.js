@@ -1,8 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from './constants';
 
-// ─── Token ───────────────────────────────────────────────────────────────────
-
 export const storeToken = async (token) => {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, token);
@@ -27,8 +25,6 @@ export const removeToken = async () => {
     console.error('Error removing token:', error);
   }
 };
-
-// ─── User ─────────────────────────────────────────────────────────────────────
 
 export const storeUser = async (user) => {
   try {
@@ -56,8 +52,6 @@ export const removeUser = async () => {
   }
 };
 
-// ─── Remember Me ──────────────────────────────────────────────────────────────
-
 export const storeRememberMe = async (value) => {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.REMEMBER_ME, JSON.stringify(value));
@@ -68,14 +62,12 @@ export const storeRememberMe = async (value) => {
 
 export const getRememberMe = async () => {
   try {
-    const val = await AsyncStorage.getItem(STORAGE_KEYS.REMEMBER_ME);
-    return val ? JSON.parse(val) : false;
+    const value = await AsyncStorage.getItem(STORAGE_KEYS.REMEMBER_ME);
+    return value ? JSON.parse(value) : false;
   } catch (error) {
     return false;
   }
 };
-
-// ─── Clear All ────────────────────────────────────────────────────────────────
 
 export const clearStorage = async () => {
   try {

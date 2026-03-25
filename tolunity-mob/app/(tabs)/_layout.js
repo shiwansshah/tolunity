@@ -17,9 +17,6 @@ function TabBarIcon({ name, color, focused }) {
 }
 
 export default function TabsLayout() {
-  const { user } = useAuth();
-  const isSecurity = user?.userType === 'SECURITY';
-
   return (
     <Tabs
       screenOptions={{
@@ -53,8 +50,6 @@ export default function TabsLayout() {
         name="payments"
         options={{
           title: 'Payments',
-          // Hide payments tab for SECURITY users
-          href: isSecurity ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <TabBarIcon name="card" focused={focused} />
           ),

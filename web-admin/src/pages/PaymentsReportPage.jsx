@@ -1,8 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { format } from 'date-fns';
 import { PageHeader, Card, Badge } from '../components/UI';
 import api from '../services/api';
-import { Search } from 'lucide-react';
-import { format } from 'date-fns';
+import { getApiErrorMessage } from '../services/apiError';
+
+const STATUS_COLORS = {
+  PAID: 'success',
+  PENDING: 'warning',
+  OVERDUE: 'danger',
+};
+
+const CATEGORY_COLORS = {
+  MAINTENANCE: 'warning',
+  GARBAGE: 'success',
+};
 
 const PaymentsReportPage = () => {
   const [payments, setPayments] = useState([]);
@@ -16,43 +27,36 @@ const PaymentsReportPage = () => {
         const response = await api.get('/admin/payments');
         const sorted = response.data.sort((a, b) => new Date(b.dueDate) - new Date(a.dueDate));
         setPayments(sorted);
-      } catch (err) {
-        console.error('Failed to load payments', err);
+      } catch (error) {
+        console.error(getApiErrorMessage(error, 'Failed to load payments'));
       } finally {
         setLoading(false);
       }
     };
+
     fetchPayments();
   }, []);
 
-  const filteredPayments = payments.filter(p => {
-    const statusMatch = statusFilter === 'ALL' || p.status?.toUpperCase() === statusFilter;
-    const catMatch = categoryFilter === 'ALL' || p.category?.toUpperCase() === categoryFilter;
-    return statusMatch && catMatch;
+  const filteredPayments = payments.filter((payment) => {
+    const statusMatch =
+      statusFilter === 'ALL' || payment.status?.toUpperCase() === statusFilter;
+    const categoryMatch =
+      categoryFilter === 'ALL' || payment.category?.toUpperCase() === categoryFilter;
+
+    return statusMatch && categoryMatch;
   });
 
-  if (loading) return <div className="p-8 text-center text-muted">Loading payments log...</div>;
-
-  const STATUS_COLORS = {
-    'PAID': 'success',
-    'PENDING': 'warning',
-    'OVERDUE': 'danger'
-  };
-
-  const CATEGORY_COLORS = {
-    'RENT': 'primary',
-    'MAINTENANCE': 'warning',
-    'ELECTRICITY': 'primary',
-    'GARBAGE': 'success',
-  };
+  if (loading) {
+    return <div className="p-8 text-center text-muted">Loading payments log...</div>;
+  }
 
   const formatNPR = (amount) => `NPR ${(amount || 0).toLocaleString('en-IN')}`;
 
   return (
     <div className="fade-in">
-      <PageHeader 
-        title="Payment Reports" 
-        subtitle="Complete ledger of all generated bills and their statuses" 
+      <PageHeader
+        title="Community Payment Reports"
+        subtitle="Ledger of maintenance and garbage bills managed by admin"
       />
 
       <Card className="mb-6">
@@ -60,14 +64,14 @@ const PaymentsReportPage = () => {
           <div>
             <p className="text-muted text-sm mb-2 font-bold">Status</p>
             <div className="flex gap-2">
-              {['ALL', 'PAID', 'PENDING', 'OVERDUE'].map(f => (
-                <button 
-                  key={f}
-                  onClick={() => setStatusFilter(f)}
-                  className={`premium-btn ${statusFilter === f ? '' : 'btn-secondary'}`}
-                  style={{padding: '0.35rem 0.85rem', fontSize: '0.8rem'}}
+              {['ALL', 'PAID', 'PENDING', 'OVERDUE'].map((filterValue) => (
+                <button
+                  key={filterValue}
+                  onClick={() => setStatusFilter(filterValue)}
+                  className={`premium-btn ${statusFilter === filterValue ? '' : 'btn-secondary'}`}
+                  style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem' }}
                 >
-                  {f}
+                  {filterValue}
                 </button>
               ))}
             </div>
@@ -75,14 +79,14 @@ const PaymentsReportPage = () => {
           <div>
             <p className="text-muted text-sm mb-2 font-bold">Category</p>
             <div className="flex gap-2">
-              {['ALL', 'RENT', 'MAINTENANCE', 'ELECTRICITY', 'GARBAGE'].map(f => (
-                <button 
-                  key={f}
-                  onClick={() => setCategoryFilter(f)}
-                  className={`premium-btn ${categoryFilter === f ? '' : 'btn-secondary'}`}
-                  style={{padding: '0.35rem 0.85rem', fontSize: '0.8rem'}}
+              {['ALL', 'MAINTENANCE', 'GARBAGE'].map((filterValue) => (
+                <button
+                  key={filterValue}
+                  onClick={() => setCategoryFilter(filterValue)}
+                  className={`premium-btn ${categoryFilter === filterValue ? '' : 'btn-secondary'}`}
+                  style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem' }}
                 >
-                  {f}
+                  {filterValue}
                 </button>
               ))}
             </div>
@@ -104,7 +108,7 @@ const PaymentsReportPage = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredPayments.map(payment => (
+              {filteredPayments.map((payment) => (
                 <tr key={payment.id}>
                   <td>
                     <div className="font-bold">{payment.title}</div>
@@ -117,7 +121,9 @@ const PaymentsReportPage = () => {
                   <td>{payment.payeeName || <span className="text-muted">ID: {payment.payeeId}</span>}</td>
                   <td>{payment.payerName || <span className="text-muted">Unassigned</span>}</td>
                   <td className="font-bold">{formatNPR(payment.amount)}</td>
-                  <td className="text-sm">{payment.dueDate ? format(new Date(payment.dueDate), 'MMM dd, yyyy') : 'N/A'}</td>
+                  <td className="text-sm">
+                    {payment.dueDate ? format(new Date(payment.dueDate), 'MMM dd, yyyy') : 'N/A'}
+                  </td>
                   <td>
                     <Badge variant={STATUS_COLORS[payment.status?.toUpperCase()] || 'gray'}>
                       {payment.status}
@@ -126,7 +132,11 @@ const PaymentsReportPage = () => {
                 </tr>
               ))}
               {filteredPayments.length === 0 && (
-                <tr><td colSpan="6" className="text-center py-8 text-muted">No payments found for this filter</td></tr>
+                <tr>
+                  <td colSpan="6" className="text-center py-8 text-muted">
+                    No payments found for this filter
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

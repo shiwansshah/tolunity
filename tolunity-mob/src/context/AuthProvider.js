@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { AuthContext } from './AuthContext';
 import {
-  storeToken,
-  removeToken,
-  storeUser,
-  removeUser,
+  storeRememberMe,
+  getRememberMe,
   getToken,
   getUser,
+  storeToken,
+  storeUser,
   clearStorage,
 } from '../utils/storage';
 import { globalEvent } from '../utils/EventEmitter';
@@ -24,9 +24,12 @@ export default function AuthProvider({ children }) {
       try {
         const storedToken = await getToken();
         const storedUser = await getUser();
-        if (storedToken && storedUser) {
+        const rememberSession = await getRememberMe();
+        if (storedToken && storedUser && rememberSession) {
           setToken(storedToken);
           setUser(storedUser);
+        } else if (storedToken || storedUser) {
+          await clearStorage();
         }
       } catch (error) {
         console.error('Error restoring session:', error);
@@ -54,7 +57,9 @@ export default function AuthProvider({ children }) {
    * Login: store token + user data
    * @param {Object} data - { token, name, email, userRole }
    */
-  const login = async (data) => {
+  const login = async (data, options = {}) => {
+    const rememberMe = options.rememberMe ?? true;
+    await storeRememberMe(rememberMe);
     await storeToken(data.token);
     await storeUser(data);
     setToken(data.token);

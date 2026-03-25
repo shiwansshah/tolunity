@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { format } from 'date-fns';
+import { Heart, DollarSign } from 'lucide-react';
 import { PageHeader, Card, Badge } from '../components/UI';
 import api from '../services/api';
-import { Heart, DollarSign } from 'lucide-react';
-import { format } from 'date-fns';
+import { getApiErrorMessage } from '../services/apiError';
 import './CharityPage.css';
 
 const CharityPage = () => {
@@ -12,19 +13,25 @@ const CharityPage = () => {
   useEffect(() => {
     const fetchCharity = async () => {
       try {
-        const res = await api.get('/admin/charity');
-        setData(res.data);
-      } catch (err) {
-        console.error('Failed to load charity data', err);
+        const response = await api.get('/admin/charity');
+        setData(response.data);
+      } catch (error) {
+        console.error(getApiErrorMessage(error, 'Failed to load charity data'));
       } finally {
         setLoading(false);
       }
     };
+
     fetchCharity();
   }, []);
 
-  if (loading) return <div className="p-8 text-center text-muted">Loading charity data...</div>;
-  if (!data) return <div className="p-8 text-danger">Failed to load charity data</div>;
+  if (loading) {
+    return <div className="p-8 text-center text-muted">Loading charity data...</div>;
+  }
+
+  if (!data) {
+    return <div className="p-8 text-danger">Failed to load charity data</div>;
+  }
 
   const formatNPR = (amount) => `NPR ${(amount || 0).toLocaleString('en-IN')}`;
 
@@ -70,16 +77,24 @@ const CharityPage = () => {
               </tr>
             </thead>
             <tbody>
-              {data.donations && data.donations.map(d => (
-                <tr key={d.id}>
-                  <td className="font-bold">{d.donorName}</td>
-                  <td><Badge variant="success">{formatNPR(d.amount)}</Badge></td>
-                  <td className="text-muted">{d.message || '—'}</td>
-                  <td className="text-sm">{d.createdAt ? format(new Date(d.createdAt), 'MMM dd, yyyy') : 'N/A'}</td>
+              {data.donations?.map((donation) => (
+                <tr key={donation.id}>
+                  <td className="font-bold">{donation.donorName}</td>
+                  <td>
+                    <Badge variant="success">{formatNPR(donation.amount)}</Badge>
+                  </td>
+                  <td className="text-muted">{donation.message || '-'}</td>
+                  <td className="text-sm">
+                    {donation.createdAt ? format(new Date(donation.createdAt), 'MMM dd, yyyy') : 'N/A'}
+                  </td>
                 </tr>
               ))}
               {(!data.donations || data.donations.length === 0) && (
-                <tr><td colSpan="4" className="text-center py-8 text-muted">No donations yet</td></tr>
+                <tr>
+                  <td colSpan="4" className="text-center py-8 text-muted">
+                    No donations yet
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

@@ -164,21 +164,26 @@ export default function ProfileScreen() {
             {user?.userType && (
               <View style={[styles.roleBadge, {
                 backgroundColor: user.userType === 'OWNER' ? '#EEF2FF' :
-                                 user.userType === 'TENANT' ? '#E8FFF0' : '#FFF9E6',
+                                 user.userType === 'TENANT' ? '#E8FFF0' :
+                                 user.userType === 'ADMIN' ? '#FDECEC' : '#FFF9E6',
               }]}>
                 <Ionicons
                   name={user.userType === 'OWNER' ? 'home' :
-                        user.userType === 'TENANT' ? 'key' : 'shield-checkmark'}
+                        user.userType === 'TENANT' ? 'key' :
+                        user.userType === 'ADMIN' ? 'shield-checkmark' : 'shield-checkmark'}
                   size={12}
                   color={user.userType === 'OWNER' ? COLORS.primary :
-                         user.userType === 'TENANT' ? '#2ECC71' : '#F39C12'}
+                         user.userType === 'TENANT' ? '#2ECC71' :
+                         user.userType === 'ADMIN' ? COLORS.error : '#F39C12'}
                 />
                 <Text style={[styles.roleText, {
                   color: user.userType === 'OWNER' ? COLORS.primary :
-                         user.userType === 'TENANT' ? '#2ECC71' : '#F39C12',
+                         user.userType === 'TENANT' ? '#2ECC71' :
+                         user.userType === 'ADMIN' ? COLORS.error : '#F39C12',
                 }]}>
                   {user.userType === 'OWNER' ? 'Owner' :
-                   user.userType === 'TENANT' ? 'Tenant' : 'Security'}
+                   user.userType === 'TENANT' ? 'Tenant' :
+                   user.userType === 'ADMIN' ? 'Admin' : 'Security'}
                 </Text>
               </View>
             )}
@@ -186,12 +191,12 @@ export default function ProfileScreen() {
             {/* Role Badge */}
             <View style={styles.roleBadge}>
               <Ionicons
-                name={user?.userRole === 'ROLE_ADMIN' ? 'shield-checkmark' : 'people'}
+                name={user?.userRole === 'ADMIN' ? 'shield-checkmark' : 'people'}
                 size={12}
                 color={COLORS.primary}
               />
               <Text style={styles.roleText}>
-                {user?.userRole === 'ROLE_ADMIN' ? 'Administrator' : 'Community Member'}
+                {user?.userRole === 'ADMIN' ? 'Administrator' : 'Community User'}
               </Text>
             </View>
           </View>

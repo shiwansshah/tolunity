@@ -19,14 +19,18 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class AdminService {
+
+    private static final Set<String> ADMIN_MANAGED_FEE_TYPES = Set.of("MAINTENANCE", "GARBAGE");
 
     private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
@@ -36,18 +40,20 @@ public class AdminService {
 
     public ResponseEntity<?> getDashboardStats() {
         List<User> allUsers = userRepository.findAllByDelFlgFalse();
-        List<Payment> allPayments = paymentRepository.findAllByDelFlgFalseOrderByDueDateDesc();
+        List<Payment> adminManagedPayments = paymentRepository.findAllByDelFlgFalseOrderByDueDateDesc().stream()
+                .filter(payment -> isAdminManagedCategory(payment.getCategory()))
+                .toList();
         List<CharityDonation> allDonations = charityDonationRepository.findByDelFlgFalseOrderByCreatedAtDesc();
 
         long totalUsers = allUsers.size();
         long ownersCount = allUsers.stream().filter(user -> user.getUserType() == UserTypeEnum.OWNER).count();
         long tenantsCount = allUsers.stream().filter(user -> user.getUserType() == UserTypeEnum.TENANT).count();
 
-        double collectedRevenue = allPayments.stream()
+        double collectedRevenue = adminManagedPayments.stream()
                 .filter(payment -> "Paid".equalsIgnoreCase(payment.getStatus()))
                 .mapToDouble(Payment::getAmount)
                 .sum();
-        double pendingRevenue = allPayments.stream()
+        double pendingRevenue = adminManagedPayments.stream()
                 .filter(payment -> !"Paid".equalsIgnoreCase(payment.getStatus()))
                 .mapToDouble(Payment::getAmount)
                 .sum();
@@ -59,20 +65,18 @@ public class AdminService {
         stats.put("totalUsers", totalUsers);
         stats.put("ownersCount", ownersCount);
         stats.put("tenantsCount", tenantsCount);
-        stats.put("totalPayments", allPayments.size());
+        stats.put("totalPayments", adminManagedPayments.size());
         stats.put("collectedRevenue", collectedRevenue);
         stats.put("pendingRevenue", pendingRevenue);
         stats.put("charityTotal", charityTotal);
-        stats.put("maintenanceCollected", sumCollectedByCategory(allPayments, "MAINTENANCE"));
-        stats.put("electricityCollected", sumCollectedByCategory(allPayments, "ELECTRICITY"));
-        stats.put("garbageCollected", sumCollectedByCategory(allPayments, "GARBAGE"));
-        stats.put("rentCollected", sumCollectedByCategory(allPayments, "RENT"));
+        stats.put("maintenanceCollected", sumCollectedByCategory(adminManagedPayments, "MAINTENANCE"));
+        stats.put("garbageCollected", sumCollectedByCategory(adminManagedPayments, "GARBAGE"));
 
         return ResponseEntity.ok(stats);
     }
 
     public ResponseEntity<?> getAllUsers() {
-        List<Map<String, Object>> userList = userRepository.findAll().stream()
+        List<Map<String, Object>> userList = userRepository.findAllByDelFlgFalse().stream()
                 .map(this::mapUser)
                 .collect(Collectors.toList());
 
@@ -90,11 +94,16 @@ public class AdminService {
     }
 
     public ResponseEntity<?> getAllPayments() {
-        return ResponseEntity.ok(paymentDtoMapper.toDtos(paymentRepository.findAllByDelFlgFalseOrderByDueDateDesc()));
+        List<Payment> adminManagedPayments = paymentRepository.findAllByDelFlgFalseOrderByDueDateDesc().stream()
+                .filter(payment -> isAdminManagedCategory(payment.getCategory()))
+                .toList();
+        return ResponseEntity.ok(paymentDtoMapper.toDtos(adminManagedPayments));
     }
 
     public ResponseEntity<?> getFeeConfigs() {
-        return ResponseEntity.ok(feeConfigRepository.findByActiveFlgTrueOrderByFeeTypeAsc());
+        return ResponseEntity.ok(feeConfigRepository.findByActiveFlgTrueOrderByFeeTypeAsc().stream()
+                .filter(config -> ADMIN_MANAGED_FEE_TYPES.contains(config.getFeeType()))
+                .toList());
     }
 
     public ResponseEntity<?> saveFeeConfig(Map<String, Object> request) {
@@ -144,7 +153,7 @@ public class AdminService {
         User admin = userRepository.findFirstByRoleAndDelFlgFalse(UserRolesEnum.ROLE_ADMIN)
                 .orElseThrow(() -> new ResourceNotFoundException("No admin user found in system"));
 
-        List<User> payers = getEligiblePayers(feeType);
+        List<User> payers = getEligiblePayers();
         if (payers.isEmpty()) {
             return ResponseEntity.ok(Map.of("message", "No eligible payers found", "billsGenerated", 0));
         }
@@ -194,7 +203,7 @@ public class AdminService {
         map.put("name", user.getName());
         map.put("email", user.getEmail());
         map.put("phoneNumber", user.getPhoneNumber());
-        map.put("role", user.getRole() != null ? user.getRole().toString() : null);
+        map.put("role", normalizeRole(user.getRole()));
         map.put("userType", user.getUserType() != null ? user.getUserType().toString() : null);
         map.put("activeFlg", user.isActiveFlg());
         map.put("delFlg", user.isDelFlg());
@@ -203,25 +212,47 @@ public class AdminService {
 
     private String validateFeeType(String rawFeeType) {
         if (rawFeeType == null || rawFeeType.isBlank()) {
-            throw new IllegalArgumentException("feeType is required (MAINTENANCE, ELECTRICITY, or GARBAGE)");
+            throw new IllegalArgumentException("feeType is required (MAINTENANCE or GARBAGE)");
         }
 
         String feeType = rawFeeType.toUpperCase();
-        if (!List.of("MAINTENANCE", "ELECTRICITY", "GARBAGE").contains(feeType)) {
-            throw new IllegalArgumentException("Invalid fee type. Must be MAINTENANCE, ELECTRICITY, or GARBAGE");
+        if (!ADMIN_MANAGED_FEE_TYPES.contains(feeType)) {
+            throw new IllegalArgumentException("Invalid fee type. Must be MAINTENANCE or GARBAGE");
         }
 
         return feeType;
     }
 
-    private List<User> getEligiblePayers(String feeType) {
-        if ("ELECTRICITY".equalsIgnoreCase(feeType)) {
-            return userRepository.findByUserTypeAndDelFlgFalse(UserTypeEnum.OWNER);
+    private List<User> getEligiblePayers() {
+        Set<Long> uniqueIds = new HashSet<>();
+        List<User> payers = new ArrayList<>();
+
+        userRepository.findByUserTypeAndDelFlgFalse(UserTypeEnum.OWNER).forEach(user -> {
+            if (uniqueIds.add(user.getId())) {
+                payers.add(user);
+            }
+        });
+        userRepository.findByUserTypeAndDelFlgFalse(UserTypeEnum.TENANT).forEach(user -> {
+            if (uniqueIds.add(user.getId())) {
+                payers.add(user);
+            }
+        });
+
+        return payers;
+    }
+
+    private boolean isAdminManagedCategory(String category) {
+        return category != null && ADMIN_MANAGED_FEE_TYPES.contains(category.toUpperCase());
+    }
+
+    private String normalizeRole(UserRolesEnum role) {
+        if (role == null) {
+            return null;
         }
 
-        List<User> payers = new ArrayList<>();
-        payers.addAll(userRepository.findByUserTypeAndDelFlgFalse(UserTypeEnum.OWNER));
-        payers.addAll(userRepository.findByUserTypeAndDelFlgFalse(UserTypeEnum.TENANT));
-        return payers;
+        return switch (role) {
+            case ROLE_ADMIN -> "ADMIN";
+            case ROLE_USER -> "USER";
+        };
     }
 }

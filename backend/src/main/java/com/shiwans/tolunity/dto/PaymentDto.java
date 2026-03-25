@@ -16,4 +16,6 @@ public class PaymentDto {
     private String payerName;
     private String payeeName;
     private String icon; // Provided for the mobile app
+    private String gatewayProvider;
+    private String gatewayStatus;
 }

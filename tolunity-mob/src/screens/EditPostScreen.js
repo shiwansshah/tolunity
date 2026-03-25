@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { MediaTypeOptions } from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { editPost } from '../api/feedApi';
+import { getApiErrorMessage } from '../api/apiError';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
@@ -26,12 +27,12 @@ export default function EditPostScreen() {
   const params = useLocalSearchParams();
   const postId = params.postId;
   const initialContent = params.content || '';
-  
+
   let initialMedias = [];
   try {
     initialMedias = params.medias ? JSON.parse(params.medias) : [];
-  } catch (e) {
-    console.error("Failed parsing medias", e);
+  } catch (error) {
+    console.error('Failed parsing medias', error);
   }
 
   const [content, setContent] = useState(initialContent);
@@ -53,12 +54,12 @@ export default function EditPostScreen() {
     });
 
     if (!result.canceled) {
-      setMediaAssets((prev) => [...prev, ...result.assets]);
+      setMediaAssets((currentAssets) => [...currentAssets, ...result.assets]);
     }
   };
 
   const removeMedia = (index) => {
-    setMediaAssets((prev) => prev.filter((_, i) => i !== index));
+    setMediaAssets((currentAssets) => currentAssets.filter((_, assetIndex) => assetIndex !== index));
   };
 
   const handleSave = async () => {
@@ -70,40 +71,37 @@ export default function EditPostScreen() {
     setLoading(true);
     try {
       const mediaList = mediaAssets.map((asset) => {
-        // If it was already a URL from the backend, keep it
-        if (asset.mediaUrl) return asset;
+        if (asset.mediaUrl) {
+          return asset;
+        }
 
-        // If it's a new asset from picker
         const isVideo = asset.type === 'video';
         const mediaType = isVideo ? 'video' : 'image';
-        
-        let fileExtArr = asset.uri.split('.');
-        const ext = fileExtArr[fileExtArr.length - 1];
-        
-        const base64Uri = asset.base64 ? `data:${isVideo ? 'video' : 'image'}/${ext};base64,${asset.base64}` : asset.uri;
+        const fileSegments = asset.uri.split('.');
+        const extension = fileSegments[fileSegments.length - 1];
+        const base64Uri = asset.base64
+          ? `data:${isVideo ? 'video' : 'image'}/${extension};base64,${asset.base64}`
+          : asset.uri;
 
         return {
           mediaUrl: base64Uri,
-          mediaType: mediaType,
+          mediaType,
         };
       });
 
       await editPost(postId, { content: content.trim(), mediaList });
-      Alert.alert('Updated! ✅', 'Your post has been updated.', [
-        { 
-          text: 'OK', 
+      Alert.alert('Updated', 'Your post has been updated.', [
+        {
+          text: 'OK',
           onPress: () => {
             setTimeout(() => {
               router.back();
             }, 150);
-          }
+          },
         },
       ]);
-    } catch (err) {
-      Alert.alert(
-        'Update Failed',
-        err.response?.data?.error || 'Unable to update post.'
-      );
+    } catch (error) {
+      Alert.alert('Update Failed', getApiErrorMessage(error, 'Unable to update post.'));
     } finally {
       setLoading(false);
     }
@@ -112,86 +110,74 @@ export default function EditPostScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backBtn}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="arrow-back" size={24} color="#FFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Post</Text>
-          <View style={{ width: 40 }} />
-        </View>
-
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <ScrollView
-            contentContainerStyle={styles.content}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View style={styles.card}>
-              <Text style={styles.label}>Edit your post</Text>
-              <InputField
-                placeholder="What's on your mind?"
-                value={content}
-                onChangeText={setContent}
-                iconName="create-outline"
-                autoCapitalize="sentences"
-              />
+          <Ionicons name="arrow-back" size={24} color="#FFF" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Edit Post</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <View style={styles.card}>
+            <Text style={styles.label}>Edit your post</Text>
+            <InputField
+              placeholder="What's on your mind?"
+              value={content}
+              onChangeText={setContent}
+              iconName="create-outline"
+              autoCapitalize="sentences"
+            />
+          </View>
+
+          {mediaAssets.length > 0 && (
+            <View style={styles.mediaPreviewContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {mediaAssets.map((asset, index) => (
+                  <View key={index} style={styles.mediaWrapper}>
+                    <Image source={{ uri: asset.uri || asset.mediaUrl }} style={styles.mediaThumbnail} />
+                    {(asset.type === 'video' || asset.mediaType === 'VIDEO') && (
+                      <View style={styles.playIconOverlay}>
+                        <Ionicons name="play" size={24} color="#FFF" />
+                      </View>
+                    )}
+                    <TouchableOpacity style={styles.removeMediaBtn} onPress={() => removeMedia(index)}>
+                      <Ionicons name="close" size={16} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
             </View>
+          )}
 
-            {/* Media Preview Section */}
-            {mediaAssets.length > 0 && (
-              <View style={styles.mediaPreviewContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {mediaAssets.map((asset, index) => (
-                    <View key={index} style={styles.mediaWrapper}>
-                      <Image source={{ uri: asset.uri || asset.mediaUrl }} style={styles.mediaThumbnail} />
-                      {(asset.type === 'video' || asset.mediaType === 'VIDEO') && (
-                        <View style={styles.playIconOverlay}>
-                          <Ionicons name="play" size={24} color="#FFF" />
-                        </View>
-                      )}
-                      <TouchableOpacity
-                        style={styles.removeMediaBtn}
-                        onPress={() => removeMedia(index)}
-                      >
-                        <Ionicons name="close" size={16} color="#FFF" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
+          <TouchableOpacity style={styles.attachBtn} onPress={pickMedia} activeOpacity={0.8}>
+            <View style={styles.attachIconWrap}>
+              <Ionicons name="image-outline" size={24} color={COLORS.primary} />
+            </View>
+            <Text style={styles.attachText}>Add Photo/Video</Text>
+          </TouchableOpacity>
 
-            {/* Media Attachment Action */}
-            <TouchableOpacity style={styles.attachBtn} onPress={pickMedia} activeOpacity={0.8}>
-              <View style={styles.attachIconWrap}>
-                <Ionicons name="image-outline" size={24} color={COLORS.primary} />
-              </View>
-              <Text style={styles.attachText}>Add Photo/Video</Text>
-            </TouchableOpacity>
+          <Button
+            title="Save Changes"
+            onPress={handleSave}
+            loading={loading}
+            iconName="checkmark-outline"
+            iconPosition="left"
+            style={styles.saveBtn}
+          />
 
-            <Button
-              title="Save Changes"
-              onPress={handleSave}
-              loading={loading}
-              iconName="checkmark-outline"
-              iconPosition="left"
-              style={styles.saveBtn}
-            />
-
-            <Button
-              title="Cancel"
-              onPress={() => router.back()}
-              variant="outline"
-            />
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+          <Button title="Cancel" onPress={() => router.back()} variant="outline" />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -200,21 +186,34 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: {
     backgroundColor: COLORS.primary,
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
     ...SHADOWS.header,
   },
   backBtn: {
-    width: 40, height: 40, alignItems: 'center', justifyContent: 'center',
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: { fontSize: FONTS.sizes.lg, fontWeight: '700', color: '#FFF' },
   content: { padding: SPACING.lg, paddingBottom: SPACING.xxxl },
   card: {
-    backgroundColor: COLORS.bgCard, borderRadius: RADIUS.xl,
-    padding: SPACING.xl, marginBottom: SPACING.md, ...SHADOWS.card,
+    backgroundColor: COLORS.bgCard,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.xl,
+    marginBottom: SPACING.md,
+    ...SHADOWS.card,
   },
-  label: { fontSize: FONTS.sizes.lg, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.md },
+  label: {
+    fontSize: FONTS.sizes.lg,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.md,
+  },
   saveBtn: { marginBottom: SPACING.md },
   attachBtn: {
     flexDirection: 'row',

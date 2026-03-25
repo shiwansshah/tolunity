@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/useAuth';
 import AdminLayout from './layouts/AdminLayout';
 
 // Pages to be created
@@ -10,6 +11,7 @@ import UsersPage from './pages/UsersPage';
 import PaymentsReportPage from './pages/PaymentsReportPage';
 import FeeConfigPage from './pages/FeeConfigPage';
 import CharityPage from './pages/CharityPage';
+import ComplaintsPage from './pages/ComplaintsPage';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -34,6 +36,7 @@ function App() {
             <Route path="users" element={<UsersPage />} />
             <Route path="payments" element={<PaymentsReportPage />} />
             <Route path="fee-config" element={<FeeConfigPage />} />
+            <Route path="complaints" element={<ComplaintsPage />} />
             <Route path="charity" element={<CharityPage />} />
           </Route>
           

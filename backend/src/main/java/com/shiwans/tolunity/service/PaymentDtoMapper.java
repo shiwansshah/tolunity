@@ -52,6 +52,8 @@ public class PaymentDtoMapper {
         dto.setPayerId(payment.getPayerId());
         dto.setPayeeId(payment.getPayeeId());
         dto.setIcon(resolveIcon(payment.getCategory()));
+        dto.setGatewayProvider(payment.getGatewayProvider());
+        dto.setGatewayStatus(payment.getGatewayStatus());
 
         User payer = payment.getPayerId() != null ? usersById.get(payment.getPayerId()) : null;
         if (payer != null) {
@@ -73,7 +75,6 @@ public class PaymentDtoMapper {
 
         return switch (category.toUpperCase()) {
             case "RENT" -> "home-outline";
-            case "ELECTRICITY" -> "flash-outline";
             case "MAINTENANCE" -> "construct-outline";
             case "GARBAGE" -> "trash-outline";
             case "CHARITY" -> "heart-outline";

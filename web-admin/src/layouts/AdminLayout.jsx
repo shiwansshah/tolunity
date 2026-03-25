@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, CreditCard, LogOut, Shield, Settings, Heart } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { LayoutDashboard, Users, CreditCard, LogOut, Shield, Settings, Heart, Flag } from 'lucide-react';
+import { useAuth } from '../context/useAuth';
 import './AdminLayout.css';
 
 const AdminLayout = () => {
@@ -16,8 +16,9 @@ const AdminLayout = () => {
   const navItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/users', icon: Users, label: 'User Management' },
-    { path: '/payments', icon: CreditCard, label: 'Payment Reports' },
+    { path: '/payments', icon: CreditCard, label: 'Community Payments' },
     { path: '/fee-config', icon: Settings, label: 'Fee Configuration' },
+    { path: '/complaints', icon: Flag, label: 'Complaints' },
     { path: '/charity', icon: Heart, label: 'Charity Fund' },
   ];
 

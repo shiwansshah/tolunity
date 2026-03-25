@@ -1,9 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-
-const AuthContext = createContext();
-
-export const useAuth = () => useContext(AuthContext);
+import { AuthContext } from './authContextObject';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -15,7 +12,12 @@ export const AuthProvider = ({ children }) => {
       const storedUser = localStorage.getItem('admin_user');
       
       if (storedToken && storedUser) {
-        setUser(JSON.parse(storedUser));
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch {
+          localStorage.removeItem('admin_token');
+          localStorage.removeItem('admin_user');
+        }
       }
       setLoading(false);
     };
@@ -28,13 +30,19 @@ export const AuthProvider = ({ children }) => {
     const data = response.data;
     
     // Ensure the logged in user actually has Admin privileges
-    if (data.userRole !== 'ROLE_ADMIN') {
+    if (data.userRole !== 'ADMIN') {
         throw new Error('Access Denied. You are not an administrator.');
     }
 
     localStorage.setItem('admin_token', data.token);
-    localStorage.setItem('admin_user', JSON.stringify({ name: data.name, email: data.email, role: data.userRole }));
-    setUser({ name: data.name, email: data.email, role: data.userRole });
+    const adminUser = {
+      name: data.name,
+      email: data.email,
+      role: data.userRole,
+      userType: data.userType ?? null,
+    };
+    localStorage.setItem('admin_user', JSON.stringify(adminUser));
+    setUser(adminUser);
     
     return data;
   };
@@ -43,7 +51,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_user');
     setUser(null);
-    window.location.href = '/login';
+    window.location.assign('/login');
   };
 
   return (

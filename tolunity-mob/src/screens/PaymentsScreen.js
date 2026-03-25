@@ -1,684 +1,368 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
-  StatusBar,
-  Modal,
-  Animated,
-  Alert,
   ScrollView,
+  StatusBar,
   ActivityIndicator,
+  Alert,
+  Modal,
   TextInput,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { API_BASE_URL } from '../utils/constants';
 import { getOwners, selectOwner, getMyTenants, removeTenant, hasOwner } from '../api/userApi';
-import { getMyPayments, payBill, createBill } from '../api/paymentApi';
+import { getMyPayments, initiatePayment, verifyPayment, createBill, donateToCharity } from '../api/paymentApi';
+import { getApiErrorMessage } from '../api/apiError';
 
-// ─── Shared Constants ───────────────────────────────────────────────────────────
-
-const STATUS_CONFIG = {
-  Pending: { bg: '#FFF9E6', text: '#F39C12', borderColor: '#FFF0B2' },
-  Overdue: { bg: '#FFF0F0', text: COLORS.error, borderColor: '#FFD0D0' },
-  Paid: { bg: '#E8FFF0', text: COLORS.success, borderColor: '#C2F0D5' },
-};
-
-const GATEWAY_CONFIG = {
-  esewa: { name: 'eSewa', color: '#60BB46', icon: 'wallet-outline', textColor: '#FFF' },
-  khalti: { name: 'Khalti', color: '#5C2D91', icon: 'card-outline', textColor: '#FFF' },
-};
-
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A';
-  const date = new Date(dateString);
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
-};
-
+const GATEWAYS = { ESEWA: { label: 'eSewa' }, KHALTI: { label: 'Khalti' } };
+const COMMUNITY = ['MAINTENANCE', 'GARBAGE'];
 const formatNPR = (amount) => `NPR ${(amount || 0).toLocaleString('en-IN')}`;
+const isPending = (status) => status === 'Pending' || status === 'Overdue';
+const isCommunity = (payment) => COMMUNITY.includes((payment?.category || '').toUpperCase());
+const formatDate = (dateString) => (dateString ? new Date(dateString).toLocaleDateString() : 'N/A');
 
-// ─── Payment Gateway Modal ──────────────────────────────────────────────────────
+function Card({ children, style }) {
+  return <View style={[styles.card, style]}>{children}</View>;
+}
 
-function PaymentModal({ visible, onClose, payment, onPaymentSuccess }) {
-  const [selectedGateway, setSelectedGateway] = useState(null);
-  const [processing, setProcessing] = useState(false);
-  const slideAnim = useRef(new Animated.Value(400)).current;
+function PaymentCard({ item, onPay, extra }) {
+  return (
+    <Card style={styles.row}>
+      <View style={styles.left}>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.meta}>{item.category}</Text>
+        <Text style={styles.meta}>{extra || `Due ${formatDate(item.dueDate)}`}</Text>
+      </View>
+      <View style={styles.right}>
+        <Text style={styles.amount}>{formatNPR(item.amount)}</Text>
+        {onPay && isPending(item.status) ? (
+          <TouchableOpacity style={styles.payBtn} onPress={() => onPay(item)}>
+            <Text style={styles.payBtnText}>Pay</Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.status}>{item.status}</Text>
+        )}
+      </View>
+    </Card>
+  );
+}
+
+function GatewayModal({ visible, payment, onClose, onPaid }) {
+  const [gateway, setGateway] = useState('ESEWA');
+  const [loading, setLoading] = useState(false);
+  const [session, setSession] = useState(null);
+  const sessionRef = useRef(null);
+  sessionRef.current = session;
+
+  const verifyCurrent = useCallback(async () => {
+    if (!payment || !sessionRef.current) return;
+    setLoading(true);
+    try {
+      const payload = sessionRef.current.gateway === 'KHALTI'
+        ? { gateway: 'KHALTI', pidx: sessionRef.current.pidx }
+        : { gateway: 'ESEWA', transactionUuid: sessionRef.current.transactionUuid, totalAmount: payment.amount };
+      const response = await verifyPayment(payment.id, payload);
+      if (response.data?.verified) {
+        Alert.alert('Payment Verified', 'The payment was confirmed successfully.');
+        setSession(null);
+        onClose();
+        onPaid?.();
+      } else {
+        Alert.alert('Verification Pending', `Gateway status: ${response.data?.status || 'Unknown'}`);
+      }
+    } catch (error) {
+      Alert.alert('Verification Failed', getApiErrorMessage(error, 'Unable to verify payment.'));
+    } finally {
+      setLoading(false);
+    }
+  }, [payment, onClose, onPaid]);
 
   useEffect(() => {
-    if (visible) {
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 65,
-        friction: 10,
-      }).start();
-    } else {
-      slideAnim.setValue(400);
-      setSelectedGateway(null);
-    }
-  }, [visible]);
+    if (!visible) return undefined;
+    const sub = Linking.addEventListener('url', ({ url }) => {
+      if (url.includes('khalti') || url.includes('esewa')) verifyCurrent();
+    });
+    return () => sub.remove();
+  }, [visible, verifyCurrent]);
 
-  const handlePay = async () => {
-    if (!selectedGateway) {
-      Alert.alert('Select Gateway', 'Please select a payment method');
-      return;
-    }
-    setProcessing(true);
+  const start = async () => {
+    if (!payment) return;
+    setLoading(true);
     try {
-      // API call to record the payment in DB
-      await payBill(payment.id);
-      
-      setProcessing(false);
-      onClose();
-      Alert.alert(
-        'Payment Successful! ✅',
-        `${formatNPR(payment?.amount)} paid via ${GATEWAY_CONFIG[selectedGateway].name}`,
-        [{ text: 'Done', onPress: () => onPaymentSuccess?.(payment?.id) }]
-      );
+      const response = await initiatePayment(payment.id, {
+        gateway,
+        returnUrl: `tolunitymob://payments/${gateway.toLowerCase()}`,
+        successUrl: 'tolunitymob://payments/esewa-success',
+        failureUrl: 'tolunitymob://payments/esewa-failure',
+        websiteUrl: 'https://tolunity.local',
+      });
+      if (gateway === 'KHALTI') {
+        setSession({ gateway, pidx: response.data?.pidx });
+        await Linking.openURL(response.data?.paymentUrl);
+      } else {
+        setSession({ gateway, transactionUuid: response.data?.transactionUuid });
+        const bridgeUrl = `${API_BASE_URL}/payments/pay/${payment.id}/esewa-redirect?transactionUuid=${encodeURIComponent(response.data?.transactionUuid)}&successUrl=${encodeURIComponent('tolunitymob://payments/esewa-success')}&failureUrl=${encodeURIComponent('tolunitymob://payments/esewa-failure')}`;
+        await Linking.openURL(bridgeUrl);
+      }
     } catch (error) {
-      setProcessing(false);
-      Alert.alert('Payment Failed', 'Something went wrong while processing the payment.');
+      Alert.alert('Gateway Error', getApiErrorMessage(error, 'Unable to start payment gateway.'));
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!payment) return null;
-
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={modalStyles.overlay}>
-        <Animated.View style={[modalStyles.sheet, { transform: [{ translateY: slideAnim }] }]}>
-          <View style={modalStyles.header}>
-            <Text style={modalStyles.headerTitle}>Pay Now</Text>
-            <TouchableOpacity onPress={onClose} style={modalStyles.closeBtn}>
-              <Ionicons name="close" size={22} color={COLORS.textMuted} />
-            </TouchableOpacity>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modal}>
+          <Text style={styles.modalTitle}>{payment?.title || 'Payment'}</Text>
+          <Text style={styles.modalAmount}>{payment ? formatNPR(payment.amount) : ''}</Text>
+          <View style={styles.gatewayRow}>
+            {Object.entries(GATEWAYS).map(([key, value]) => (
+              <TouchableOpacity key={key} style={[styles.gatewayChip, gateway === key && styles.gatewayChipActive]} onPress={() => setGateway(key)}>
+                <Text style={[styles.gatewayChipText, gateway === key && styles.gatewayChipTextActive]}>{value.label}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-          <View style={modalStyles.amountCard}>
-            <Text style={modalStyles.amountLabel}>{payment.title}</Text>
-            <Text style={modalStyles.amountValue}>{formatNPR(payment.amount)}</Text>
-            <Text style={modalStyles.amountDue}>Due: {formatDate(payment.dueDate)}</Text>
-          </View>
-          <Text style={modalStyles.sectionTitle}>Choose Payment Method</Text>
-          <View style={modalStyles.gatewayRow}>
-            {Object.entries(GATEWAY_CONFIG).map(([key, gw]) => {
-              const isSelected = selectedGateway === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  style={[modalStyles.gatewayCard, isSelected && { borderColor: gw.color, backgroundColor: gw.color + '12' }]}
-                  activeOpacity={0.7}
-                  onPress={() => setSelectedGateway(key)}
-                >
-                  <View style={[modalStyles.gatewayIcon, { backgroundColor: gw.color }]}>
-                    <Ionicons name={gw.icon} size={24} color={gw.textColor} />
-                  </View>
-                  <Text style={[modalStyles.gatewayName, isSelected && { color: gw.color, fontWeight: '800' }]}>{gw.name}</Text>
-                  {isSelected && (
-                    <View style={[modalStyles.gatewayCheck, { backgroundColor: gw.color }]}>
-                      <Ionicons name="checkmark" size={12} color="#FFF" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          <TouchableOpacity
-            style={[modalStyles.payBtn, selectedGateway && { backgroundColor: GATEWAY_CONFIG[selectedGateway].color }, processing && { opacity: 0.7 }]}
-            onPress={handlePay}
-            disabled={processing}
-            activeOpacity={0.8}
-          >
-            {processing ? (
-              <ActivityIndicator color="#FFF" />
-            ) : (
-              <><Ionicons name="lock-closed" size={16} color="#FFF" /><Text style={modalStyles.payBtnText}>Pay {formatNPR(payment.amount)}</Text></>
-            )}
+          <TouchableOpacity style={styles.primaryBtn} onPress={start} disabled={loading}>
+            {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryBtnText}>Open Gateway</Text>}
           </TouchableOpacity>
-          <Text style={modalStyles.secureText}>
-            <Ionicons name="shield-checkmark" size={11} color={COLORS.success} /> Secured & Encrypted Payment
-          </Text>
-        </Animated.View>
+          {session && (
+            <TouchableOpacity style={styles.secondaryBtn} onPress={verifyCurrent} disabled={loading}>
+              <Text style={styles.secondaryBtnText}>Verify After Returning</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.textBtn} onPress={onClose}>
+            <Text style={styles.textBtnText}>Close</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </Modal>
   );
 }
 
-// ─── SECURITY VIEW ──────────────────────────────────────────────────────────────
+function SecurityPayments() {
+  const [amount, setAmount] = useState('');
+  const [message, setMessage] = useState('');
+  const [saving, setSaving] = useState(false);
 
-function SecurityView() {
+  const donate = async () => {
+    const value = parseFloat(amount);
+    if (!value || value <= 0) return Alert.alert('Invalid Amount', 'Enter a valid donation amount.');
+    setSaving(true);
+    try {
+      await donateToCharity({ amount: value, message });
+      setAmount('');
+      setMessage('');
+      Alert.alert('Donation Added', 'Charity donation was recorded.');
+    } catch (error) {
+      Alert.alert('Donation Failed', getApiErrorMessage(error, 'Unable to donate.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Payments</Text>
-      </View>
-      <View style={styles.emptyState}>
-        <View style={styles.emptyIcon}>
-          <Ionicons name="shield" size={48} color={COLORS.textMuted} />
-        </View>
-        <Text style={styles.emptyTitle}>Not Available</Text>
-        <Text style={styles.emptySubtitle}>Payment features are not available for security accounts.</Text>
-      </View>
-    </SafeAreaView>
+    <ScrollView contentContainerStyle={styles.content}>
+      <Card>
+        <Text style={styles.sectionTitle}>Security Payment Access</Text>
+        <Text style={styles.meta}>Security accounts keep all app features except regular payment modules. Charity donation is the only payment action here.</Text>
+      </Card>
+      <Card>
+        <TextInput style={styles.input} value={amount} onChangeText={setAmount} keyboardType="numeric" placeholder="Donation amount" placeholderTextColor={COLORS.textMuted} />
+        <TextInput style={[styles.input, styles.textArea]} value={message} onChangeText={setMessage} placeholder="Message (optional)" placeholderTextColor={COLORS.textMuted} multiline />
+        <TouchableOpacity style={styles.primaryBtn} onPress={donate} disabled={saving}>
+          {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryBtnText}>Donate to Charity</Text>}
+        </TouchableOpacity>
+      </Card>
+    </ScrollView>
   );
 }
 
-// ─── TENANT VIEW ────────────────────────────────────────────────────────────────
-
-function TenantView() {
+function TenantPayments() {
   const [loading, setLoading] = useState(true);
-  const [ownerConfigured, setOwnerConfigured] = useState(false);
-  const [ownersList, setOwnersList] = useState([]);
+  const [ownerLinked, setOwnerLinked] = useState(false);
+  const [owners, setOwners] = useState([]);
   const [payments, setPayments] = useState([]);
-  const [selectedTab, setSelectedTab] = useState('All');
-  const [payModal, setPayModal] = useState({ visible: false, payment: null });
-  const tabs = ['All', 'Pending', 'Paid'];
+  const [modalPayment, setModalPayment] = useState(null);
 
-  const fetchData = useCallback(async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await hasOwner();
-      if (res.data.hasOwner) {
-        setOwnerConfigured(true);
-        const payRes = await getMyPayments();
-        setPayments(payRes.data);
-      } else {
+      const [ownerStatus, paymentRes] = await Promise.all([hasOwner(), getMyPayments()]);
+      const linked = Boolean(ownerStatus.data?.hasOwner);
+      setOwnerLinked(linked);
+      setPayments(Array.isArray(paymentRes.data) ? paymentRes.data : []);
+      if (!linked) {
         const ownerRes = await getOwners();
-        setOwnersList(ownerRes.data);
+        setOwners(Array.isArray(ownerRes.data) ? ownerRes.data : []);
+      } else {
+        setOwners([]);
       }
-    } catch (err) {
-      console.warn('Error fetching tenant data', err);
+    } catch (error) {
+      Alert.alert('Load Failed', getApiErrorMessage(error, 'Unable to load payments.'));
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { load(); }, [load]);
+  if (loading) return <View style={styles.loader}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
 
-  const handleSelectOwner = async (ownerId) => {
-    try {
-      setLoading(true);
-      await selectOwner(ownerId);
-      Alert.alert('Success', 'Owner linked successfully!');
-      fetchData(); // reload
-    } catch (err) {
-      setLoading(false);
-      Alert.alert('Error', 'Failed to select owner');
-    }
-  };
+  const communityPayments = payments.filter(isCommunity);
+  const rentPayments = payments.filter((payment) => !isCommunity(payment));
+  const due = payments.filter((payment) => isPending(payment.status)).reduce((sum, payment) => sum + (payment.amount || 0), 0);
+  const paid = payments.filter((payment) => payment.status === 'Paid').reduce((sum, payment) => sum + (payment.amount || 0), 0);
 
-  const filtered = selectedTab === 'All'
-    ? payments
-    : payments.filter((p) => p.status === selectedTab || (selectedTab === 'Pending' && p.status === 'Overdue'));
-
-  const pendingTotal = payments
-    .filter((p) => p.status === 'Pending' || p.status === 'Overdue')
-    .reduce((sum, p) => sum + p.amount, 0);
-
-  const paidTotal = payments
-    .filter((p) => p.status === 'Paid')
-    .reduce((sum, p) => sum + p.amount, 0);
-
-  if (loading) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
-
-  // Choose Owner Screen
-  if (!ownerConfigured) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Select Your Owner</Text>
-        </View>
-        <Text style={{ padding: SPACING.lg, fontSize: FONTS.sizes.md, color: COLORS.textSecondary }}>
-          Please select the property owner you are renting from to enable the payment dashboard.
-        </Text>
-        <FlatList
-          data={ownersList}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.payCard} onPress={() => handleSelectOwner(item.id)}>
-              <View style={[styles.payIconWrap, { backgroundColor: '#EEF2FF' }]}>
-                <Ionicons name="home" size={22} color={COLORS.primary} />
-              </View>
-              <View style={styles.payInfo}>
-                <Text style={styles.payTitle}>{item.name}</Text>
-                <Text style={styles.payDue}>{item.email}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={24} color={COLORS.textMuted} />
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={<Text style={{ textAlign: 'center', opacity: 0.5, marginTop: 20 }}>No owners found.</Text>}
-        />
-      </SafeAreaView>
-    );
-  }
-
-  // Dashboard Screen
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Dashboard</Text>
-      </View>
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{formatNPR(pendingTotal)}</Text>
-          <Text style={styles.summaryLabel}>Total Due</Text>
-        </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryItem}>
-          <Text style={[styles.summaryValue, { color: '#A8FFD0' }]}>{formatNPR(paidTotal)}</Text>
-          <Text style={styles.summaryLabel}>Total Paid</Text>
-        </View>
-      </View>
-      <View style={styles.tabsRow}>
-        {tabs.map((tab) => (
-          <TouchableOpacity key={tab} style={[styles.tab, selectedTab === tab && styles.tabActive]} onPress={() => setSelectedTab(tab)}>
-            <Text style={[styles.tabText, selectedTab === tab && styles.tabTextActive]}>{tab}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => {
-          const cfg = STATUS_CONFIG[item.status] || STATUS_CONFIG.Pending;
-          const canPay = item.status !== 'Paid';
-          return (
-            <View style={styles.payCard}>
-              <View style={[styles.payIconWrap, { backgroundColor: cfg.bg }]}>
-                <Ionicons name={item.icon || 'receipt-outline'} size={22} color={cfg.text} />
-              </View>
-              <View style={styles.payInfo}>
-                <Text style={styles.payTitle}>{item.title}</Text>
-                <Text style={styles.payDue}>{item.payeeName ? `Pay to: ${item.payeeName} • ` : ''}Due: {formatDate(item.dueDate)}</Text>
-              </View>
-              <View style={styles.payRight}>
-                <Text style={styles.payAmount}>{formatNPR(item.amount)}</Text>
-                {canPay ? (
-                  <TouchableOpacity style={[styles.payNowBtn, item.status === 'Overdue' && { backgroundColor: COLORS.error }]} onPress={() => setPayModal({ visible: true, payment: item })}>
-                    <Text style={styles.payNowText}>Pay Now</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View style={[styles.statusBadge, { backgroundColor: cfg.bg, borderColor: cfg.borderColor }]}><Text style={[styles.statusText, { color: cfg.text }]}>{item.status}</Text></View>
-                )}
-              </View>
-            </View>
-          );
-        }}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyList}>
-            <Ionicons name="checkmark-circle" size={48} color={COLORS.success} />
-            <Text style={styles.emptyListText}>All good! No bills generated yet.</Text>
-          </View>
-        }
-      />
-      <PaymentModal
-        visible={payModal.visible}
-        payment={payModal.payment}
-        onClose={() => setPayModal({ visible: false, payment: null })}
-        onPaymentSuccess={() => fetchData()}
-      />
-    </SafeAreaView>
+    <ScrollView contentContainerStyle={styles.content}>
+      <Card style={styles.summary}><Text style={styles.summaryText}>Due {formatNPR(due)}</Text><Text style={styles.summaryText}>Paid {formatNPR(paid)}</Text></Card>
+      {!ownerLinked && (
+        <Card>
+          <Text style={styles.sectionTitle}>Owner Link</Text>
+          <Text style={styles.meta}>Rent remains between owner and tenant only. Link your owner here if you want rent bills inside the app.</Text>
+          {owners.map((owner) => (
+            <TouchableOpacity key={owner.id} style={styles.linkRow} onPress={async () => { await selectOwner(owner.id); load(); }}>
+              <Text style={styles.title}>{owner.name}</Text>
+              <Text style={styles.meta}>{owner.email}</Text>
+            </TouchableOpacity>
+          ))}
+        </Card>
+      )}
+      <Card><Text style={styles.sectionTitle}>Community Fees</Text><Text style={styles.meta}>Admin-managed payments now include only maintenance and garbage collection.</Text></Card>
+      {communityPayments.length ? communityPayments.map((item) => <PaymentCard key={item.id} item={item} onPay={setModalPayment} />) : <Card><Text style={styles.meta}>No community fees available.</Text></Card>}
+      <Card><Text style={styles.sectionTitle}>Rent Bills</Text><Text style={styles.meta}>Rent billing is shown only for linked owner-tenant relationships and is excluded from admin reporting.</Text></Card>
+      {ownerLinked ? (
+        rentPayments.length ? rentPayments.map((item) => <PaymentCard key={item.id} item={item} onPay={setModalPayment} extra={`${item.payeeName ? `Pay to ${item.payeeName} • ` : ''}Due ${formatDate(item.dueDate)}`} />) : <Card><Text style={styles.meta}>No rent bills available.</Text></Card>
+      ) : <Card><Text style={styles.meta}>Link an owner first to receive rent bills.</Text></Card>}
+      <GatewayModal visible={!!modalPayment} payment={modalPayment} onClose={() => setModalPayment(null)} onPaid={load} />
+    </ScrollView>
   );
 }
 
-// ─── OWNER VIEW ─────────────────────────────────────────────────────────────────
-
-function OwnerView() {
+function OwnerPayments() {
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState('tenants');
-  const [tenants, setTenants] = useState([]);
   const [payments, setPayments] = useState([]);
-  const [createBillModal, setCreateBillModal] = useState({ visible: false, tenantId: null, tenantName: '' });
-
+  const [tenants, setTenants] = useState([]);
+  const [modalPayment, setModalPayment] = useState(null);
+  const [billTenant, setBillTenant] = useState(null);
   const [billTitle, setBillTitle] = useState('');
   const [billAmount, setBillAmount] = useState('');
-  const [billCategory, setBillCategory] = useState('RENT');
-  
-  const sections = [
-    { key: 'reports', label: 'Overview', icon: 'pie-chart-outline' },
-    { key: 'tenants', label: 'My Tenants', icon: 'people-outline' },
-    { key: 'collections', label: 'Collections', icon: 'cash-outline' },
-  ];
 
-  const fetchData = useCallback(async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
     try {
-      const [tRes, pRes] = await Promise.all([
-        getMyTenants(),
-        getMyPayments()
-      ]);
-      setTenants(tRes.data);
-      setPayments(pRes.data);
-    } catch (err) {
-      console.warn("Owner fetch error", err);
+      const [paymentRes, tenantRes] = await Promise.all([getMyPayments(), getMyTenants()]);
+      setPayments(Array.isArray(paymentRes.data) ? paymentRes.data : []);
+      setTenants(Array.isArray(tenantRes.data) ? tenantRes.data : []);
+    } catch (error) {
+      Alert.alert('Load Failed', getApiErrorMessage(error, 'Unable to load owner payments.'));
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { load(); }, [load]);
+  if (loading) return <View style={styles.loader}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
 
-  const handleRemoveTenant = async (id, name) => {
-    Alert.alert('Remove Tenant', `Are you sure you want to remove ${name}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: async () => {
-          try {
-            await removeTenant(id);
-            fetchData();
-          } catch(e) { Alert.alert('Error', 'Failed to remove tenant'); }
-      }}
-    ]);
-  };
-
-  const handleCreateBill = async () => {
-    if(!billTitle || !billAmount) return Alert.alert('Validation Error', 'Please enter title and amount');
-    try {
-      setLoading(true);
-      await createBill({
-        title: billTitle,
-        amount: parseFloat(billAmount),
-        category: billCategory,
-        payerId: createBillModal.tenantId
-      });
-      setCreateBillModal({visible: false});
-      setBillTitle('');
-      setBillAmount('');
-      fetchData();
-      Alert.alert('Success', 'Bill generated sent to tenant!');
-    } catch (err) {
-      setLoading(false);
-      Alert.alert('Error', 'Failed to create bill');
-    }
-  };
-
-  if (loading && tenants.length === 0) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
-
-  const totalCollected = payments.filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0);
-  const totalPending = payments.filter(p => p.status !== 'Paid').reduce((sum, p) => sum + p.amount, 0);
+  const communityPayments = payments.filter(isCommunity);
+  const rentPayments = payments.filter((payment) => (payment.category || '').toUpperCase() === 'RENT');
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Owner Tools</Text>
-      </View>
-
-      <View style={styles.tabsRow}>
-        {sections.map((sec) => (
-          <TouchableOpacity key={sec.key} style={[styles.tab, activeSection === sec.key && styles.tabActive]} onPress={() => setActiveSection(sec.key)}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name={sec.icon} size={14} color={activeSection === sec.key ? '#FFF' : COLORS.textMuted} />
-              <Text style={[styles.tabText, activeSection === sec.key && styles.tabTextActive]}>{sec.label}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Overview Section */}
-      {activeSection === 'reports' && (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.listContent}>
-           <View style={ownerStyles.summaryCard}>
-              <Text style={ownerStyles.summaryTitle}>Revenue Overview</Text>
-              <View style={ownerStyles.summaryRow}>
-                <View style={ownerStyles.summaryDot}>
-                  <View style={[ownerStyles.dot, { backgroundColor: COLORS.success }]} />
-                  <Text style={ownerStyles.summaryRowLabel}>Total Collected</Text>
-                </View>
-                <Text style={ownerStyles.summaryRowValue}>{formatNPR(totalCollected)}</Text>
-              </View>
-              <View style={ownerStyles.summaryRow}>
-                <View style={ownerStyles.summaryDot}>
-                  <View style={[ownerStyles.dot, { backgroundColor: COLORS.warning }]} />
-                  <Text style={ownerStyles.summaryRowLabel}>Pending Generation</Text>
-                </View>
-                <Text style={ownerStyles.summaryRowValue}>{formatNPR(totalPending)}</Text>
-              </View>
-           </View>
-        </ScrollView>
-      )}
-
-      {/* Tenants Section */}
-      {activeSection === 'tenants' && (
-        <FlatList
-          data={tenants}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <View style={styles.payCard}>
-              <View style={[styles.payIconWrap, { backgroundColor: '#E8FFF0' }]}>
-                <Ionicons name="person" size={22} color={COLORS.success} />
-              </View>
-              <View style={styles.payInfo}>
-                <Text style={styles.payTitle}>{item.name}</Text>
-                <Text style={styles.payDue}>{item.email}</Text>
-              </View>
-              <View style={{flexDirection: 'row', gap: 8}}>
-                <TouchableOpacity onPress={() => setCreateBillModal({visible: true, tenantId: item.id, tenantName: item.name})} style={{backgroundColor: COLORS.primary, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.sm}}>
-                  <Text style={{color: '#FFF', fontSize: 11, fontWeight: '700'}}>Bill</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleRemoveTenant(item.id, item.name)} style={{backgroundColor: COLORS.error, paddingHorizontal: 10, paddingVertical: 6, borderRadius: RADIUS.sm}}>
-                  <Text style={{color: '#FFF', fontSize: 11, fontWeight: '700'}}>Remove</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-          ListEmptyComponent={<Text style={{textAlign: 'center', color: COLORS.textMuted, marginTop: 40}}>No tenants selected you as their owner.</Text>}
-        />
-      )}
-
-      {/* Collections Section */}
-      {activeSection === 'collections' && (
-        <FlatList
-          data={payments}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => {
-            const cfg = STATUS_CONFIG[item.status] || STATUS_CONFIG.Pending;
-            return (
-              <View style={styles.payCard}>
-                <View style={[styles.payIconWrap, { backgroundColor: cfg.bg }]}>
-                  <Ionicons name={item.icon || 'cash-outline'} size={22} color={cfg.text} />
-                </View>
-                <View style={styles.payInfo}>
-                  <Text style={styles.payTitle}>{item.title}  <Text style={{fontSize: 10, opacity: 0.5}}>- {item.payerName}</Text></Text>
-                  <Text style={styles.payDue}>Due: {formatDate(item.dueDate)}</Text>
-                </View>
-                <View style={styles.payRight}>
-                  <Text style={styles.payAmount}>{formatNPR(item.amount)}</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: cfg.bg, borderColor: cfg.borderColor }]}><Text style={[styles.statusText, { color: cfg.text }]}>{item.status}</Text></View>
-                </View>
-              </View>
-            )
-          }}
-          ListEmptyComponent={<Text style={{textAlign: 'center', color: COLORS.textMuted, marginTop: 40}}>No bills generated yet.</Text>}
-        />
-      )}
-
-      {/* Bill Generation Modal */}
-      <Modal visible={createBillModal.visible} transparent animationType="slide">
-        <View style={modalStyles.overlay}>
-          <View style={modalStyles.sheet}>
-            <View style={modalStyles.header}>
-              <Text style={modalStyles.headerTitle}>Generate Bill</Text>
-              <TouchableOpacity onPress={() => setCreateBillModal({visible: false})} style={modalStyles.closeBtn}>
-                <Ionicons name="close" size={22} color={COLORS.textMuted} />
-              </TouchableOpacity>
-            </View>
-            <Text style={{marginBottom: 10, color: COLORS.textMuted}}>Recipient: <Text style={{fontWeight: '700', color: COLORS.textPrimary}}>{createBillModal.tenantName}</Text></Text>
-            
-            <TextInput style={ownerStyles.input} placeholder="Title (e.g., May Rent)" value={billTitle} onChangeText={setBillTitle} />
-            <TextInput style={ownerStyles.input} placeholder="Amount (NPR)" keyboardType="numeric" value={billAmount} onChangeText={setBillAmount} />
-
-            <View style={ownerStyles.infoNote}>
-              <Ionicons name="information-circle-outline" size={16} color={COLORS.primary} />
-              <Text style={ownerStyles.infoNoteText}>
-                Owners can generate rent bills here. Community charges are managed from admin billing setup.
-              </Text>
-            </View>
-
-            <View style={{flexDirection: 'row', gap: 10, marginBottom: 20}}>
-              {['RENT'].map(cat => (
-                <TouchableOpacity key={cat} onPress={() => setBillCategory(cat)} style={[ownerStyles.catBtn, billCategory === cat && ownerStyles.catBtnActive]}>
-                  <Text style={[ownerStyles.catBtnText, billCategory === cat && {color: '#FFF'}]}>{cat}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <TouchableOpacity style={modalStyles.payBtn} onPress={handleCreateBill} disabled={loading}>
-              <Text style={modalStyles.payBtnText}>{loading ? 'Sending...' : 'Send Bill to Tenant'}</Text>
+    <ScrollView contentContainerStyle={styles.content}>
+      <Card><Text style={styles.sectionTitle}>Community Fees</Text><Text style={styles.meta}>Owners still pay maintenance and garbage dues here with the new gateway flow.</Text></Card>
+      {communityPayments.length ? communityPayments.map((item) => <PaymentCard key={item.id} item={item} onPay={setModalPayment} />) : <Card><Text style={styles.meta}>No community fees available.</Text></Card>}
+      <Card><Text style={styles.sectionTitle}>Tenants</Text><Text style={styles.meta}>Rent remains an owner-tenant matter and does not count toward admin revenue.</Text></Card>
+      {tenants.length ? tenants.map((tenant) => (
+        <Card key={tenant.id} style={styles.row}>
+          <View style={styles.left}><Text style={styles.title}>{tenant.name}</Text><Text style={styles.meta}>{tenant.email}</Text></View>
+          <View style={styles.actionCol}>
+            <TouchableOpacity style={styles.payBtn} onPress={() => setBillTenant(tenant)}><Text style={styles.payBtnText}>Bill</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.payBtn, { backgroundColor: COLORS.error }]} onPress={async () => { await removeTenant(tenant.id); load(); }}><Text style={styles.payBtnText}>Remove</Text></TouchableOpacity>
+          </View>
+        </Card>
+      )) : <Card><Text style={styles.meta}>No linked tenants available.</Text></Card>}
+      <Card><Text style={styles.sectionTitle}>Rent Collections</Text></Card>
+      {rentPayments.length ? rentPayments.map((item) => <PaymentCard key={item.id} item={item} extra={`${item.payerName ? `Tenant ${item.payerName} • ` : ''}Due ${formatDate(item.dueDate)}`} />) : <Card><Text style={styles.meta}>No rent bills available.</Text></Card>}
+      <GatewayModal visible={!!modalPayment} payment={modalPayment} onClose={() => setModalPayment(null)} onPaid={load} />
+      <Modal visible={!!billTenant} transparent animationType="slide" onRequestClose={() => setBillTenant(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Create Rent Bill</Text>
+            <Text style={styles.meta}>Tenant: {billTenant?.name}</Text>
+            <TextInput style={styles.input} value={billTitle} onChangeText={setBillTitle} placeholder="April Rent" placeholderTextColor={COLORS.textMuted} />
+            <TextInput style={styles.input} value={billAmount} onChangeText={setBillAmount} keyboardType="numeric" placeholder="12000" placeholderTextColor={COLORS.textMuted} />
+            <TouchableOpacity style={styles.primaryBtn} onPress={async () => {
+              try {
+                await createBill({ title: billTitle, amount: parseFloat(billAmount), payerId: billTenant.id, category: 'RENT' });
+                setBillTenant(null); setBillTitle(''); setBillAmount(''); load();
+              } catch (error) {
+                Alert.alert('Bill Failed', getApiErrorMessage(error, 'Unable to create rent bill.'));
+              }
+            }}>
+              <Text style={styles.primaryBtnText}>Send Bill</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
+    </ScrollView>
+  );
+}
 
+export default function PaymentsScreen() {
+  const { user } = useAuth();
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
+      <View style={styles.header}><Text style={styles.headerTitle}>Payments</Text></View>
+      {user?.userType === 'SECURITY' ? <SecurityPayments /> : user?.userType === 'OWNER' ? <OwnerPayments /> : <TenantPayments />}
     </SafeAreaView>
   );
 }
 
-// ─── MAIN EXPORT ────────────────────────────────────────────────────────────────
-
-export default function PaymentsScreen() {
-  const { user } = useAuth();
-  if (user?.userType === 'SECURITY') return <SecurityView />;
-  if (user?.userType === 'OWNER') return <OwnerView />;
-  return <TenantView />;
-}
-
-// ─── Styles ──────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.feedBg },
-  header: {
-    backgroundColor: COLORS.primary,
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
-    ...SHADOWS.header,
-  },
-  headerTitle: { fontSize: FONTS.sizes.xl, fontWeight: '800', color: '#FFF', flex: 1 },
-  summaryCard: {
-    backgroundColor: COLORS.primary,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: SPACING.xxxl, paddingBottom: SPACING.xl,
-    paddingTop: SPACING.sm,
-  },
-  summaryItem: { flex: 1, alignItems: 'center' },
-  summaryValue: { fontSize: FONTS.sizes.xl, fontWeight: '800', color: '#FFF' },
-  summaryLabel: { fontSize: FONTS.sizes.xs, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
-  summaryDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.2)' },
-  tabsRow: {
-    flexDirection: 'row', backgroundColor: COLORS.bgCard,
-    marginHorizontal: SPACING.lg, marginTop: SPACING.lg,
-    borderRadius: RADIUS.xl, padding: 4, ...SHADOWS.card,
-  },
-  tab: { flex: 1, paddingVertical: SPACING.sm, alignItems: 'center', borderRadius: RADIUS.lg },
-  tabActive: { backgroundColor: COLORS.primary },
-  tabText: { fontSize: FONTS.sizes.sm, fontWeight: '600', color: COLORS.textMuted },
-  tabTextActive: { color: '#FFF' },
-  listContent: { padding: SPACING.lg, paddingBottom: SPACING.xxxl },
-  payCard: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.bgCard, borderRadius: RADIUS.lg,
-    padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOWS.card,
-  },
-  payIconWrap: {
-    width: 46, height: 46, borderRadius: RADIUS.md,
-    alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md,
-  },
-  payInfo: { flex: 1 },
-  payTitle: { fontSize: FONTS.sizes.md, fontWeight: '700', color: COLORS.textPrimary },
-  payDue: { fontSize: FONTS.sizes.xs, color: COLORS.textMuted, marginTop: 2 },
-  payRight: { alignItems: 'flex-end' },
-  payAmount: { fontSize: FONTS.sizes.md, fontWeight: '800', color: COLORS.textPrimary, marginBottom: 4 },
-  payNowBtn: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 5,
-    borderRadius: RADIUS.pill,
-  },
-  payNowText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
-  statusBadge: {
-    paddingHorizontal: SPACING.sm, paddingVertical: 3,
-    borderRadius: RADIUS.pill, borderWidth: 1,
-  },
-  statusText: { fontSize: 10, fontWeight: '700' },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xxxl },
-  emptyIcon: { width: 96, height: 96, borderRadius: 48, backgroundColor: COLORS.bgInput, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.xl },
-  emptyTitle: { fontSize: FONTS.sizes.xl, fontWeight: '800', color: COLORS.textPrimary, marginBottom: SPACING.sm },
-  emptySubtitle: { fontSize: FONTS.sizes.sm, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 20 },
-  emptyList: { alignItems: 'center', paddingVertical: SPACING.xxxl * 2 },
-  emptyListText: { fontSize: FONTS.sizes.sm, color: COLORS.textSecondary, marginTop: SPACING.md },
-});
-
-const ownerStyles = StyleSheet.create({
-  summaryCard: { backgroundColor: COLORS.bgCard, borderRadius: RADIUS.lg, padding: SPACING.xl, ...SHADOWS.card },
-  summaryTitle: { fontSize: FONTS.sizes.md, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.md },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SPACING.sm },
-  summaryDot: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  summaryRowLabel: { fontSize: FONTS.sizes.sm, color: COLORS.textSecondary },
-  summaryRowValue: { fontSize: FONTS.sizes.sm, fontWeight: '700', color: COLORS.textPrimary },
-  input: { backgroundColor: COLORS.bgInput, borderWidth: 1, borderColor: COLORS.bgInputBorder, borderRadius: RADIUS.md, padding: SPACING.md, marginBottom: SPACING.md, fontSize: FONTS.sizes.md },
-  infoNote: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SPACING.sm,
-    backgroundColor: '#EEF2FF',
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    marginBottom: SPACING.md,
-  },
-  infoNoteText: {
-    flex: 1,
-    fontSize: FONTS.sizes.xs,
-    color: COLORS.primary,
-    lineHeight: 18,
-  },
-  catBtn: { flex: 1, padding: SPACING.sm, borderWidth: 1, borderColor: COLORS.bgInputBorder, borderRadius: RADIUS.md, alignItems: 'center' },
-  catBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  catBtnText: { fontSize: 10, fontWeight: '700', color: COLORS.textSecondary }
-});
-
-const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#FFF', borderTopLeftRadius: RADIUS.xxl, borderTopRightRadius: RADIUS.xxl, padding: SPACING.xxl, paddingBottom: SPACING.xxxl + 10 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xl },
-  headerTitle: { fontSize: FONTS.sizes.xl, fontWeight: '800', color: COLORS.textPrimary },
-  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.bgInput, alignItems: 'center', justifyContent: 'center' },
-  amountCard: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, padding: SPACING.xl, alignItems: 'center', marginBottom: SPACING.xl },
-  amountLabel: { fontSize: FONTS.sizes.sm, color: 'rgba(255,255,255,0.7)', marginBottom: SPACING.xs },
-  amountValue: { fontSize: 28, fontWeight: '900', color: '#FFF' },
-  amountDue: { fontSize: FONTS.sizes.xs, color: 'rgba(255,255,255,0.6)', marginTop: SPACING.xs },
-  sectionTitle: { fontSize: FONTS.sizes.sm, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.md },
-  gatewayRow: { flexDirection: 'row', gap: SPACING.md, marginBottom: SPACING.xxl },
-  gatewayCard: { flex: 1, borderRadius: RADIUS.lg, borderWidth: 2, borderColor: COLORS.bgInputBorder, padding: SPACING.lg, alignItems: 'center', position: 'relative' },
-  gatewayIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.sm },
-  gatewayName: { fontSize: FONTS.sizes.md, fontWeight: '600', color: COLORS.textPrimary },
-  gatewayCheck: { position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  payBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: SPACING.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, ...SHADOWS.button },
-  payBtnText: { color: '#FFF', fontSize: FONTS.sizes.md, fontWeight: '800' },
-  secureText: { textAlign: 'center', fontSize: FONTS.sizes.xs, color: COLORS.textMuted, marginTop: SPACING.md },
+  header: { backgroundColor: COLORS.primary, padding: SPACING.lg, ...SHADOWS.header },
+  headerTitle: { color: '#FFF', fontSize: FONTS.sizes.xl, fontWeight: '800' },
+  content: { padding: SPACING.lg, paddingBottom: SPACING.xxxl },
+  loader: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.feedBg },
+  card: { backgroundColor: COLORS.bgCard, borderRadius: RADIUS.lg, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOWS.card },
+  summary: { backgroundColor: COLORS.primary, flexDirection: 'row', justifyContent: 'space-between' },
+  summaryText: { color: '#FFF', fontWeight: '800' },
+  row: { flexDirection: 'row', alignItems: 'center' },
+  left: { flex: 1 },
+  right: { alignItems: 'flex-end', marginLeft: SPACING.md },
+  actionCol: { gap: SPACING.sm },
+  title: { fontSize: FONTS.sizes.md, fontWeight: '800', color: COLORS.textPrimary },
+  sectionTitle: { fontSize: FONTS.sizes.md, fontWeight: '800', color: COLORS.textPrimary, marginBottom: 4 },
+  meta: { color: COLORS.textMuted, lineHeight: 18 },
+  amount: { fontWeight: '800', color: COLORS.textPrimary, marginBottom: 6 },
+  status: { color: COLORS.textMuted, fontWeight: '700' },
+  payBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.pill, paddingHorizontal: SPACING.md, paddingVertical: 6 },
+  payBtnText: { color: '#FFF', fontWeight: '800', fontSize: FONTS.sizes.xs },
+  linkRow: { borderTopWidth: 1, borderTopColor: COLORS.cardBorder, paddingTop: SPACING.md, marginTop: SPACING.md },
+  input: { backgroundColor: COLORS.bgInput, borderWidth: 1, borderColor: COLORS.bgInputBorder, borderRadius: RADIUS.md, padding: SPACING.md, marginBottom: SPACING.md, color: COLORS.textPrimary },
+  textArea: { minHeight: 110, textAlignVertical: 'top' },
+  primaryBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: SPACING.lg, alignItems: 'center' },
+  primaryBtnText: { color: '#FFF', fontWeight: '800' },
+  secondaryBtn: { borderWidth: 1, borderColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: SPACING.md, alignItems: 'center', marginTop: SPACING.md },
+  secondaryBtnText: { color: COLORS.primary, fontWeight: '800' },
+  textBtn: { marginTop: SPACING.md, alignItems: 'center' },
+  textBtnText: { color: COLORS.textMuted },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modal: { backgroundColor: '#FFF', padding: SPACING.xxl, borderTopLeftRadius: RADIUS.xxl, borderTopRightRadius: RADIUS.xxl },
+  modalTitle: { fontSize: FONTS.sizes.xl, fontWeight: '800', color: COLORS.textPrimary, marginBottom: SPACING.sm },
+  modalAmount: { fontSize: FONTS.sizes.lg, fontWeight: '800', color: COLORS.primary, marginBottom: SPACING.lg },
+  gatewayRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.lg },
+  gatewayChip: { flex: 1, paddingVertical: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.bgInput, alignItems: 'center' },
+  gatewayChipActive: { backgroundColor: COLORS.primary },
+  gatewayChipText: { color: COLORS.primary, fontWeight: '700' },
+  gatewayChipTextActive: { color: '#FFF' },
 });

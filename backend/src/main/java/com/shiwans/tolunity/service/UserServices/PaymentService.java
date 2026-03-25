@@ -1,5 +1,7 @@
 package com.shiwans.tolunity.service.UserServices;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shiwans.tolunity.Repo.AdminRepos.CharityDonationRepository;
 import com.shiwans.tolunity.Repo.UserRepos.PaymentRepository;
 import com.shiwans.tolunity.Repo.UserRepository;
@@ -12,23 +14,53 @@ import com.shiwans.tolunity.entities.User;
 import com.shiwans.tolunity.enums.UserTypeEnum;
 import com.shiwans.tolunity.service.PaymentDtoMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import java.util.Comparator;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
 
+    private static final Set<String> USER_VISIBLE_CATEGORIES = Set.of("MAINTENANCE", "GARBAGE", "RENT");
+
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
     private final CharityDonationRepository charityDonationRepository;
     private final PaymentDtoMapper paymentDtoMapper;
+    private final ObjectMapper objectMapper;
+
+    @Value("${app.payments.khalti.base-url}")
+    private String khaltiBaseUrl;
+
+    @Value("${app.payments.khalti.secret-key:}")
+    private String khaltiSecretKey;
+
+    @Value("${app.payments.esewa.form-url}")
+    private String esewaFormUrl;
+
+    @Value("${app.payments.esewa.status-url}")
+    private String esewaStatusUrl;
+
+    @Value("${app.payments.esewa.product-code}")
+    private String esewaProductCode;
+
+    @Value("${app.payments.esewa.secret-key}")
+    private String esewaSecretKey;
+
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     public ResponseEntity<?> getPayments() {
         Long currentUserId = getCurrentUserId();
@@ -50,26 +82,16 @@ public class PaymentService {
             payments = paymentRepository.findByPayerIdAndDelFlgFalseOrderByDueDateDesc(currentUserId);
         }
 
-        return ResponseEntity.ok(paymentDtoMapper.toDtos(payments));
+        List<Payment> visiblePayments = payments.stream()
+                .filter(payment -> isUserVisibleCategory(payment.getCategory()))
+                .toList();
+
+        return ResponseEntity.ok(paymentDtoMapper.toDtos(visiblePayments));
     }
 
     public ResponseEntity<?> payBill(Long paymentId) {
-        Long currentUserId = getCurrentUserId();
-        Payment payment = paymentRepository.findByIdAndDelFlgFalse(paymentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Payment with ID " + paymentId + " not found"));
-
-        if ("Paid".equalsIgnoreCase(payment.getStatus())) {
-            throw new IllegalArgumentException("This payment has already been paid");
-        }
-        if (!currentUserId.equals(payment.getPayerId())) {
-            throw new AccessDeniedException("You are not authorized to pay this bill");
-        }
-
-        payment.setStatus("Paid");
-        payment.setPaidDate(new Date());
-        paymentRepository.save(payment);
-
-        return ResponseEntity.ok(Map.of("message", "Payment successful"));
+        validatePaymentAccess(paymentId);
+        throw new IllegalArgumentException("Direct payment is disabled. Use the payment gateway initiate and verify flow.");
     }
 
     public ResponseEntity<?> createBill(Map<String, Object> request) {
@@ -129,6 +151,85 @@ public class PaymentService {
         return ResponseEntity.ok(Map.of("message", "Rent bill created successfully"));
     }
 
+    public ResponseEntity<?> initiatePayment(Long paymentId, Map<String, Object> request) {
+        Payment payment = validatePaymentAccess(paymentId);
+        User currentUser = getCurrentUser(getCurrentUserId());
+        String gateway = resolveGateway((String) request.get("gateway"));
+
+        return switch (gateway) {
+            case "ESEWA" -> ResponseEntity.ok(initiateEsewa(payment, request));
+            case "KHALTI" -> ResponseEntity.ok(initiateKhalti(payment, currentUser, request));
+            default -> throw new IllegalArgumentException("Unsupported payment gateway");
+        };
+    }
+
+    public ResponseEntity<?> verifyPayment(Long paymentId, Map<String, Object> request) {
+        Payment payment = validatePaymentAccess(paymentId);
+        String gateway = resolveGateway(request.get("gateway") != null
+                ? request.get("gateway").toString()
+                : payment.getGatewayProvider());
+
+        return switch (gateway) {
+            case "ESEWA" -> ResponseEntity.ok(verifyEsewa(payment, request));
+            case "KHALTI" -> ResponseEntity.ok(verifyKhalti(payment, request));
+            default -> throw new IllegalArgumentException("Unsupported payment gateway");
+        };
+    }
+
+    public ResponseEntity<String> getEsewaRedirectPage(Long paymentId, String transactionUuid, String successUrl, String failureUrl) {
+        Payment payment = paymentRepository.findByIdAndDelFlgFalse(paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment with ID " + paymentId + " not found"));
+
+        if (!"ESEWA".equalsIgnoreCase(payment.getGatewayProvider())
+                || payment.getGatewayTransactionId() == null
+                || !payment.getGatewayTransactionId().equals(transactionUuid)) {
+            throw new IllegalArgumentException("Invalid eSewa transaction reference");
+        }
+
+        String totalAmount = formatAmount(payment.getAmount());
+        String signaturePayload = "total_amount=" + totalAmount
+                + ",transaction_uuid=" + transactionUuid
+                + ",product_code=" + esewaProductCode;
+        String html = """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                  <meta charset="utf-8" />
+                  <meta name="viewport" content="width=device-width, initial-scale=1" />
+                  <title>Redirecting to eSewa</title>
+                </head>
+                <body style="font-family: Arial, sans-serif; padding: 24px;">
+                  <p>Redirecting to eSewa sandbox...</p>
+                  <form id="esewaForm" action="%s" method="POST">
+                    <input type="hidden" name="amount" value="%s" />
+                    <input type="hidden" name="tax_amount" value="0" />
+                    <input type="hidden" name="total_amount" value="%s" />
+                    <input type="hidden" name="transaction_uuid" value="%s" />
+                    <input type="hidden" name="product_code" value="%s" />
+                    <input type="hidden" name="product_service_charge" value="0" />
+                    <input type="hidden" name="product_delivery_charge" value="0" />
+                    <input type="hidden" name="success_url" value="%s" />
+                    <input type="hidden" name="failure_url" value="%s" />
+                    <input type="hidden" name="signed_field_names" value="total_amount,transaction_uuid,product_code" />
+                    <input type="hidden" name="signature" value="%s" />
+                  </form>
+                  <script>document.getElementById('esewaForm').submit();</script>
+                </body>
+                </html>
+                """.formatted(
+                escapeHtml(esewaFormUrl),
+                escapeHtml(totalAmount),
+                escapeHtml(totalAmount),
+                escapeHtml(transactionUuid),
+                escapeHtml(esewaProductCode),
+                escapeHtml(successUrl),
+                escapeHtml(failureUrl),
+                escapeHtml(createEsewaSignature(signaturePayload))
+        );
+
+        return ResponseEntity.ok(html);
+    }
+
     public ResponseEntity<?> donateToCharity(Map<String, Object> request) {
         Long currentUserId = getCurrentUserId();
         User currentUser = getCurrentUser(currentUserId);
@@ -163,5 +264,312 @@ public class PaymentService {
     private User getCurrentUser(Long currentUserId) {
         return userRepository.findByIdAndDelFlgFalse(currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
+    }
+
+    private Payment validatePaymentAccess(Long paymentId) {
+        Long currentUserId = getCurrentUserId();
+        Payment payment = paymentRepository.findByIdAndDelFlgFalse(paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment with ID " + paymentId + " not found"));
+
+        if (!currentUserId.equals(payment.getPayerId())) {
+            throw new AccessDeniedException("You are not authorized to pay this bill");
+        }
+        if ("Paid".equalsIgnoreCase(payment.getStatus())) {
+            throw new IllegalArgumentException("This payment has already been paid");
+        }
+        if (!isUserVisibleCategory(payment.getCategory())) {
+            throw new IllegalArgumentException("This payment category is no longer supported");
+        }
+
+        return payment;
+    }
+
+    private boolean isUserVisibleCategory(String category) {
+        return category != null && USER_VISIBLE_CATEGORIES.contains(category.toUpperCase(Locale.ROOT));
+    }
+
+    private String resolveGateway(String rawGateway) {
+        if (rawGateway == null || rawGateway.isBlank()) {
+            throw new IllegalArgumentException("gateway is required");
+        }
+
+        String gateway = rawGateway.toUpperCase(Locale.ROOT);
+        if (!Set.of("ESEWA", "KHALTI").contains(gateway)) {
+            throw new IllegalArgumentException("gateway must be ESEWA or KHALTI");
+        }
+
+        return gateway;
+    }
+
+    private Map<String, Object> initiateEsewa(Payment payment, Map<String, Object> request) {
+        String transactionUuid = "tolunity-" + payment.getId() + "-" + System.currentTimeMillis();
+        String totalAmount = formatAmount(payment.getAmount());
+        String successUrl = stringOrDefault(request.get("successUrl"), stringOrDefault(request.get("returnUrl"), "tolunity://payments/esewa/success"));
+        String failureUrl = stringOrDefault(request.get("failureUrl"), stringOrDefault(request.get("returnUrl"), "tolunity://payments/esewa/failure"));
+        String signedFieldNames = "total_amount,transaction_uuid,product_code";
+        String signaturePayload = "total_amount=" + totalAmount
+                + ",transaction_uuid=" + transactionUuid
+                + ",product_code=" + esewaProductCode;
+
+        payment.setGatewayProvider("ESEWA");
+        payment.setGatewayTransactionId(transactionUuid);
+        payment.setGatewayStatus("INITIATED");
+        paymentRepository.save(payment);
+
+        Map<String, Object> formFields = new LinkedHashMap<>();
+        formFields.put("amount", totalAmount);
+        formFields.put("tax_amount", "0");
+        formFields.put("total_amount", totalAmount);
+        formFields.put("transaction_uuid", transactionUuid);
+        formFields.put("product_code", esewaProductCode);
+        formFields.put("product_service_charge", "0");
+        formFields.put("product_delivery_charge", "0");
+        formFields.put("success_url", successUrl);
+        formFields.put("failure_url", failureUrl);
+        formFields.put("signed_field_names", signedFieldNames);
+        formFields.put("signature", createEsewaSignature(signaturePayload));
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("gateway", "ESEWA");
+        response.put("paymentId", payment.getId());
+        response.put("flowType", "FORM_POST");
+        response.put("actionUrl", esewaFormUrl);
+        response.put("method", "POST");
+        response.put("transactionUuid", transactionUuid);
+        response.put("formFields", formFields);
+        return response;
+    }
+
+    private Map<String, Object> initiateKhalti(Payment payment, User currentUser, Map<String, Object> request) {
+        if (khaltiSecretKey == null || khaltiSecretKey.isBlank()) {
+            throw new IllegalArgumentException("Khalti sandbox secret key is not configured");
+        }
+
+        String returnUrl = stringOrDefault(request.get("returnUrl"), "tolunity://payments/khalti");
+        String websiteUrl = stringOrDefault(request.get("websiteUrl"), "https://tolunity.local");
+        String purchaseOrderId = "payment-" + payment.getId() + "-" + System.currentTimeMillis();
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("return_url", returnUrl);
+        payload.put("website_url", websiteUrl);
+        payload.put("amount", toPaisa(payment.getAmount()));
+        payload.put("purchase_order_id", purchaseOrderId);
+        payload.put("purchase_order_name", payment.getTitle());
+        payload.put("customer_info", Map.of(
+                "name", currentUser.getName(),
+                "email", currentUser.getEmail(),
+                "phone", currentUser.getPhoneNumber()
+        ));
+
+        Map<String, Object> responseMap = postJson(
+                khaltiBaseUrl + "/epayment/initiate/",
+                payload,
+                Map.of(
+                        "Authorization", "Key " + khaltiSecretKey,
+                        "Content-Type", "application/json"
+                )
+        );
+
+        String pidx = stringOrDefault(responseMap.get("pidx"), null);
+        if (pidx == null || pidx.isBlank()) {
+            throw new IllegalArgumentException("Khalti did not return a payment identifier");
+        }
+
+        payment.setGatewayProvider("KHALTI");
+        payment.setGatewayTransactionId(pidx);
+        payment.setGatewayStatus("INITIATED");
+        paymentRepository.save(payment);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("gateway", "KHALTI");
+        response.put("paymentId", payment.getId());
+        response.put("flowType", "REDIRECT");
+        response.put("pidx", pidx);
+        response.put("paymentUrl", responseMap.get("payment_url"));
+        response.put("expiresAt", responseMap.get("expires_at"));
+        response.put("expiresIn", responseMap.get("expires_in"));
+        return response;
+    }
+
+    private Map<String, Object> verifyEsewa(Payment payment, Map<String, Object> request) {
+        String transactionUuid = stringOrDefault(request.get("transactionUuid"), payment.getGatewayTransactionId());
+        if (transactionUuid == null || transactionUuid.isBlank()) {
+            throw new IllegalArgumentException("transactionUuid is required for eSewa verification");
+        }
+
+        String totalAmount = stringOrDefault(request.get("totalAmount"), formatAmount(payment.getAmount()));
+        String url = esewaStatusUrl
+                + "?product_code=" + encode(esewaProductCode)
+                + "&total_amount=" + encode(totalAmount)
+                + "&transaction_uuid=" + encode(transactionUuid);
+
+        Map<String, Object> responseMap = getJson(url, Collections.emptyMap());
+        String status = stringOrDefault(responseMap.get("status"), "UNKNOWN");
+        String referenceId = stringOrDefault(responseMap.get("refId"), null);
+
+        payment.setGatewayProvider("ESEWA");
+        payment.setGatewayTransactionId(transactionUuid);
+        payment.setGatewayReferenceId(referenceId);
+        payment.setGatewayStatus(status);
+
+        if ("COMPLETE".equalsIgnoreCase(status)) {
+            markPaymentAsPaid(payment);
+        } else {
+            paymentRepository.save(payment);
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("gateway", "ESEWA");
+        response.put("verified", "COMPLETE".equalsIgnoreCase(status));
+        response.put("status", status);
+        response.put("referenceId", referenceId);
+        response.put("paymentStatus", payment.getStatus());
+        return response;
+    }
+
+    private Map<String, Object> verifyKhalti(Payment payment, Map<String, Object> request) {
+        if (khaltiSecretKey == null || khaltiSecretKey.isBlank()) {
+            throw new IllegalArgumentException("Khalti sandbox secret key is not configured");
+        }
+
+        String pidx = stringOrDefault(request.get("pidx"), payment.getGatewayTransactionId());
+        if (pidx == null || pidx.isBlank()) {
+            throw new IllegalArgumentException("pidx is required for Khalti verification");
+        }
+
+        Map<String, Object> responseMap = postJson(
+                khaltiBaseUrl + "/epayment/lookup/",
+                Map.of("pidx", pidx),
+                Map.of(
+                        "Authorization", "Key " + khaltiSecretKey,
+                        "Content-Type", "application/json"
+                )
+        );
+
+        String status = stringOrDefault(responseMap.get("status"), "UNKNOWN");
+        String referenceId = stringOrDefault(responseMap.get("transaction_id"), null);
+
+        payment.setGatewayProvider("KHALTI");
+        payment.setGatewayTransactionId(pidx);
+        payment.setGatewayReferenceId(referenceId);
+        payment.setGatewayStatus(status);
+
+        if ("Completed".equalsIgnoreCase(status)) {
+            markPaymentAsPaid(payment);
+        } else {
+            paymentRepository.save(payment);
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("gateway", "KHALTI");
+        response.put("verified", "Completed".equalsIgnoreCase(status));
+        response.put("status", status);
+        response.put("referenceId", referenceId);
+        response.put("paymentStatus", payment.getStatus());
+        return response;
+    }
+
+    private void markPaymentAsPaid(Payment payment) {
+        payment.setStatus("Paid");
+        payment.setPaidDate(new Date());
+        paymentRepository.save(payment);
+    }
+
+    private String createEsewaSignature(String payload) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(esewaSecretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            mac.init(secretKeySpec);
+            byte[] hmac = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(hmac);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to create eSewa signature", ex);
+        }
+    }
+
+    private Map<String, Object> postJson(String url, Map<String, Object> payload, Map<String, String> headers) {
+        try {
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)));
+
+            headers.forEach(builder::header);
+
+            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            return parseResponse(response);
+        } catch (IllegalArgumentException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new IllegalStateException("Payment gateway request failed", ex);
+        }
+    }
+
+    private Map<String, Object> getJson(String url, Map<String, String> headers) {
+        try {
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .GET();
+
+            headers.forEach(builder::header);
+
+            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            return parseResponse(response);
+        } catch (IllegalArgumentException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new IllegalStateException("Payment gateway request failed", ex);
+        }
+    }
+
+    private Map<String, Object> parseResponse(HttpResponse<String> response) throws Exception {
+        Map<String, Object> responseMap = objectMapper.readValue(response.body(), new TypeReference<>() {});
+        if (response.statusCode() >= 400) {
+            throw new IllegalArgumentException(extractGatewayError(responseMap, response.body()));
+        }
+        return responseMap;
+    }
+
+    private String extractGatewayError(Map<String, Object> responseMap, String fallbackBody) {
+        if (responseMap.containsKey("detail")) {
+            return responseMap.get("detail").toString();
+        }
+        if (responseMap.containsKey("error_key")) {
+            return responseMap.get("error_key").toString();
+        }
+        return fallbackBody;
+    }
+
+    private long toPaisa(Double amount) {
+        return BigDecimal.valueOf(amount)
+                .multiply(BigDecimal.valueOf(100))
+                .setScale(0, RoundingMode.HALF_UP)
+                .longValue();
+    }
+
+    private String formatAmount(Double amount) {
+        return BigDecimal.valueOf(amount)
+                .setScale(2, RoundingMode.HALF_UP)
+                .stripTrailingZeros()
+                .toPlainString();
+    }
+
+    private String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private String stringOrDefault(Object value, String defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        String text = value.toString().trim();
+        return text.isEmpty() ? defaultValue : text;
+    }
+
+    private String escapeHtml(String value) {
+        return value
+                .replace("&", "&amp;")
+                .replace("\"", "&quot;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
     }
 }
