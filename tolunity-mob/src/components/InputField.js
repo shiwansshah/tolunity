@@ -9,9 +9,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SPACING, RADIUS } from '../styles/theme';
 
-/**
- * Reusable premium input field with icon, label, and validation
- */
 export default function InputField({
   label,
   placeholder,

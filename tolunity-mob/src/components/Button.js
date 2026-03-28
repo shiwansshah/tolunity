@@ -9,10 +9,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 
-/**
- * Premium Button component
- * Variants: primary, secondary, outline, ghost
- */
 export default function Button({
   title,
   onPress,

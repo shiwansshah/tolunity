@@ -16,6 +16,7 @@ import { MediaTypeOptions } from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { logoutUser, updateProfilePic } from '../api/authApi';
+import { suppressAuthFailureAlerts } from '../api/axiosInstance';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 
 export default function ProfileScreen() {
@@ -76,6 +77,7 @@ export default function ProfileScreen() {
   const doLogout = () => {
     // Timeout added to let Mobile Alert animations finish before blocking UI thread & routing
     setTimeout(async () => {
+      suppressAuthFailureAlerts();
       try {
         await logoutUser();
       } catch (e) {

@@ -42,6 +42,15 @@ public class Payment {
     @Column(name = "gateway_status")
     private String gatewayStatus;
 
+    @Column(name = "transaction_note", columnDefinition = "TEXT")
+    private String transactionNote;
+
+    @Column(name = "status_updated_at")
+    private Date statusUpdatedAt;
+
+    @Column(name = "status_updated_by")
+    private Long statusUpdatedBy;
+
     @Column(name = "interval_days")
     private Integer intervalDays; // Billing interval in days (e.g. 30 for monthly)
 

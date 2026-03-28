@@ -6,6 +6,13 @@ import { globalEvent } from '../utils/EventEmitter';
 import { getApiErrorMessage } from './apiError';
 
 let authFailureHandled = false;
+let authFailureSuppressedUntil = 0;
+
+export const suppressAuthFailureAlerts = (durationMs = 4000) => {
+  authFailureSuppressedUntil = Date.now() + durationMs;
+};
+
+const isAuthFailureSuppressed = () => Date.now() < authFailureSuppressedUntil;
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -41,6 +48,11 @@ axiosInstance.interceptors.response.use(
 
     if (error.response) {
       if ((status === 401 || status === 403) && !isLoginOrRegister && !isLogout) {
+        if (isAuthFailureSuppressed()) {
+          error.userMessage = 'Authentication is being cleared.';
+          return Promise.reject(error);
+        }
+
         if (!authFailureHandled) {
           authFailureHandled = true;
           Alert.alert(

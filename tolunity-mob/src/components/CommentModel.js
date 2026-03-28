@@ -23,7 +23,6 @@ export default function CommentModal({ visible, onClose, postId, commentsCount }
     if (!comment.trim()) return;
     setSubmitting(true);
     try {
-      // Replace with actual createComment API call
       const newComment = {
         id: Date.now().toString(),
         author: 'You',

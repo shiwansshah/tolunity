@@ -40,7 +40,7 @@ public class DatabaseSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        normalizeUserTypeColumn();
+        normalizeUserColumns();
 
         String normalizedAdminEmail = adminEmail.trim().toLowerCase();
         Optional<User> existingAdmin = userRepo.findUserByEmail(normalizedAdminEmail);
@@ -79,9 +79,24 @@ public class DatabaseSeeder implements CommandLineRunner {
         }
     }
 
-    private void normalizeUserTypeColumn() {
+    private void normalizeUserColumns() {
         try {
             jdbcTemplate.execute("ALTER TABLE user MODIFY COLUMN user_type VARCHAR(32) NULL");
+        } catch (Exception ignored) {
+            // Ignore if the table/column is already compatible in this environment.
+        }
+        try {
+            jdbcTemplate.execute("ALTER TABLE user MODIFY COLUMN user_role VARCHAR(32) NULL");
+        } catch (Exception ignored) {
+            // Ignore if the table/column is already compatible in this environment.
+        }
+        try {
+            jdbcTemplate.execute("UPDATE user SET user_type = UPPER(user_type) WHERE user_type IS NOT NULL");
+        } catch (Exception ignored) {
+            // Ignore if the table/column is already compatible in this environment.
+        }
+        try {
+            jdbcTemplate.execute("UPDATE user SET user_role = UPPER(user_role) WHERE user_role IS NOT NULL");
         } catch (Exception ignored) {
             // Ignore if the table/column is already compatible in this environment.
         }

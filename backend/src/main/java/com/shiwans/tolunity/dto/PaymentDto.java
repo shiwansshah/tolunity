@@ -16,6 +16,13 @@ public class PaymentDto {
     private String payerName;
     private String payeeName;
     private String icon; // Provided for the mobile app
+    private Date paidDate;
     private String gatewayProvider;
+    private String gatewayReferenceId;
     private String gatewayStatus;
+    private String transactionNote;
+    private Date statusUpdatedAt;
+    private Long statusUpdatedBy;
+    private String statusUpdatedByName;
+    private boolean adminManaged;
 }

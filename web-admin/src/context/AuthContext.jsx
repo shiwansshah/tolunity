@@ -28,9 +28,10 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
     const data = response.data;
+    const normalizedRole = (data.userRole || '').toUpperCase();
     
     // Ensure the logged in user actually has Admin privileges
-    if (data.userRole !== 'ADMIN') {
+    if (!['ADMIN', 'ROLE_ADMIN'].includes(normalizedRole)) {
         throw new Error('Access Denied. You are not an administrator.');
     }
 
@@ -38,7 +39,7 @@ export const AuthProvider = ({ children }) => {
     const adminUser = {
       name: data.name,
       email: data.email,
-      role: data.userRole,
+      role: normalizedRole === 'ROLE_ADMIN' ? 'ADMIN' : normalizedRole,
       userType: data.userType ?? null,
     };
     localStorage.setItem('admin_user', JSON.stringify(adminUser));

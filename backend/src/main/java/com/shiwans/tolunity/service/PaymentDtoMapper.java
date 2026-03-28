@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 
 @Component
 public class PaymentDtoMapper {
+    private static final Set<String> ADMIN_MANAGED_CATEGORIES = Set.of("MAINTENANCE", "GARBAGE");
 
     private final UserRepository userRepository;
 
@@ -52,8 +53,14 @@ public class PaymentDtoMapper {
         dto.setPayerId(payment.getPayerId());
         dto.setPayeeId(payment.getPayeeId());
         dto.setIcon(resolveIcon(payment.getCategory()));
+        dto.setPaidDate(payment.getPaidDate());
         dto.setGatewayProvider(payment.getGatewayProvider());
+        dto.setGatewayReferenceId(payment.getGatewayReferenceId());
         dto.setGatewayStatus(payment.getGatewayStatus());
+        dto.setTransactionNote(payment.getTransactionNote());
+        dto.setStatusUpdatedAt(payment.getStatusUpdatedAt());
+        dto.setStatusUpdatedBy(payment.getStatusUpdatedBy());
+        dto.setAdminManaged(isAdminManagedCategory(payment.getCategory()));
 
         User payer = payment.getPayerId() != null ? usersById.get(payment.getPayerId()) : null;
         if (payer != null) {
@@ -63,6 +70,11 @@ public class PaymentDtoMapper {
         User payee = payment.getPayeeId() != null ? usersById.get(payment.getPayeeId()) : null;
         if (payee != null) {
             dto.setPayeeName(payee.getName());
+        }
+
+        User statusUpdatedBy = payment.getStatusUpdatedBy() != null ? usersById.get(payment.getStatusUpdatedBy()) : null;
+        if (statusUpdatedBy != null) {
+            dto.setStatusUpdatedByName(statusUpdatedBy.getName());
         }
 
         return dto;
@@ -80,5 +92,9 @@ public class PaymentDtoMapper {
             case "CHARITY" -> "heart-outline";
             default -> "cash-outline";
         };
+    }
+
+    private boolean isAdminManagedCategory(String category) {
+        return category != null && ADMIN_MANAGED_CATEGORIES.contains(category.toUpperCase());
     }
 }

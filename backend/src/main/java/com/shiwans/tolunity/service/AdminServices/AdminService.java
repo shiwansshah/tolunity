@@ -4,6 +4,7 @@ import com.shiwans.tolunity.Repo.AdminRepos.CharityDonationRepository;
 import com.shiwans.tolunity.Repo.AdminRepos.FeeConfigRepository;
 import com.shiwans.tolunity.Repo.UserRepos.PaymentRepository;
 import com.shiwans.tolunity.Repo.UserRepository;
+import com.shiwans.tolunity.Util.SecurityUtil;
 import com.shiwans.tolunity.config.ResourceNotFoundException;
 import com.shiwans.tolunity.entities.Payments.CharityDonation;
 import com.shiwans.tolunity.entities.Payments.FeeConfig;
@@ -16,11 +17,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -31,12 +35,15 @@ import java.util.stream.Collectors;
 public class AdminService {
 
     private static final Set<String> ADMIN_MANAGED_FEE_TYPES = Set.of("MAINTENANCE", "GARBAGE");
+    private static final Set<String> REPORT_VISIBLE_PAYMENT_TYPES = Set.of("MAINTENANCE", "GARBAGE", "RENT");
+    private static final Set<String> PAYMENT_STATUSES = Set.of("PENDING", "PAID", "OVERDUE");
 
     private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
     private final FeeConfigRepository feeConfigRepository;
     private final CharityDonationRepository charityDonationRepository;
     private final PaymentDtoMapper paymentDtoMapper;
+    private final AdminAuditService adminAuditService;
 
     public ResponseEntity<?> getDashboardStats() {
         List<User> allUsers = userRepository.findAllByDelFlgFalse();
@@ -89,15 +96,22 @@ public class AdminService {
 
         user.setActiveFlg(!user.isActiveFlg());
         userRepository.save(user);
+        adminAuditService.logAction(
+                "USER_STATUS_UPDATED",
+                "USER",
+                user.getId(),
+                "Updated user access for " + user.getEmail(),
+                "activeFlg=" + user.isActiveFlg()
+        );
 
         return ResponseEntity.ok(Map.of("message", "User status updated successfully", "isActive", user.isActiveFlg()));
     }
 
     public ResponseEntity<?> getAllPayments() {
-        List<Payment> adminManagedPayments = paymentRepository.findAllByDelFlgFalseOrderByDueDateDesc().stream()
-                .filter(payment -> isAdminManagedCategory(payment.getCategory()))
+        List<Payment> reportPayments = paymentRepository.findAllByDelFlgFalseOrderByDueDateDesc().stream()
+                .filter(payment -> isReportVisibleCategory(payment.getCategory()))
                 .toList();
-        return ResponseEntity.ok(paymentDtoMapper.toDtos(adminManagedPayments));
+        return ResponseEntity.ok(paymentDtoMapper.toDtos(reportPayments));
     }
 
     public ResponseEntity<?> getFeeConfigs() {
@@ -137,6 +151,13 @@ public class AdminService {
         }
 
         feeConfigRepository.save(config);
+        adminAuditService.logAction(
+                "FEE_CONFIG_SAVED",
+                "FEE_CONFIG",
+                config.getId(),
+                "Saved " + feeType + " fee configuration",
+                "amount=" + amount + ", intervalDays=" + intervalDays + ", description=" + (description != null ? description : "")
+        );
         return ResponseEntity.ok(Map.of("message", "Fee configuration saved successfully", "config", config));
     }
 
@@ -175,7 +196,80 @@ public class AdminService {
             count++;
         }
 
+        adminAuditService.logAction(
+                "BILLS_GENERATED",
+                "PAYMENT_BATCH",
+                null,
+                "Generated " + count + " " + feeType + " bills",
+                "feeType=" + feeType + ", intervalDays=" + config.getIntervalDays() + ", amount=" + config.getAmount()
+        );
+
         return ResponseEntity.ok(Map.of("message", count + " bills generated successfully for " + feeType, "billsGenerated", count));
+    }
+
+    public ResponseEntity<?> updatePaymentTransaction(Long paymentId, Map<String, Object> request) {
+        Payment payment = paymentRepository.findByIdAndDelFlgFalse(paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment with ID " + paymentId + " not found"));
+
+        if (!isAdminManagedCategory(payment.getCategory())) {
+            throw new IllegalArgumentException("Only maintenance and garbage payments can be manually updated by admin");
+        }
+
+        String normalizedStatus = normalizePaymentStatus((String) request.get("status"));
+        String provider = normalizeText(request.get("gatewayProvider"));
+        String referenceId = normalizeText(request.get("gatewayReferenceId"));
+        String gatewayStatus = normalizeText(request.get("gatewayStatus"));
+        String note = normalizeText(request.get("transactionNote"));
+        Date paidDate = parseOptionalDate(request.get("paidDate"));
+
+        if (normalizedStatus != null) {
+            payment.setStatus(toTitleCase(normalizedStatus));
+        }
+
+        if (provider != null) {
+            payment.setGatewayProvider(provider.toUpperCase(Locale.ROOT));
+        } else if ("PAID".equals(normalizedStatus) && (payment.getGatewayProvider() == null || payment.getGatewayProvider().isBlank())) {
+            payment.setGatewayProvider("MANUAL");
+        }
+
+        if (referenceId != null || request.containsKey("gatewayReferenceId")) {
+            payment.setGatewayReferenceId(referenceId);
+        }
+
+        if (gatewayStatus != null) {
+            payment.setGatewayStatus(gatewayStatus);
+        } else if ("PAID".equals(normalizedStatus) && (payment.getGatewayStatus() == null || payment.getGatewayStatus().isBlank())) {
+            payment.setGatewayStatus("MANUALLY_CONFIRMED");
+        }
+
+        if (note != null || request.containsKey("transactionNote")) {
+            payment.setTransactionNote(note);
+        }
+
+        if ("PAID".equals(normalizedStatus)) {
+            payment.setPaidDate(paidDate != null ? paidDate : new Date());
+        } else if (normalizedStatus != null) {
+            payment.setPaidDate(null);
+        }
+
+        Long currentUserId = requireCurrentUserId();
+        payment.setStatusUpdatedAt(new Date());
+        payment.setStatusUpdatedBy(currentUserId);
+        paymentRepository.save(payment);
+
+        adminAuditService.logAction(
+                "PAYMENT_TRANSACTION_UPDATED",
+                "PAYMENT",
+                payment.getId(),
+                "Updated " + payment.getCategory() + " transaction for payment #" + payment.getId(),
+                "status=" + payment.getStatus()
+                        + ", gatewayProvider=" + safeText(payment.getGatewayProvider())
+                        + ", gatewayStatus=" + safeText(payment.getGatewayStatus())
+                        + ", referenceId=" + safeText(payment.getGatewayReferenceId())
+                        + ", paidDate=" + (payment.getPaidDate() != null ? payment.getPaidDate() : "null")
+        );
+
+        return ResponseEntity.ok(paymentDtoMapper.toDtos(List.of(payment)).get(0));
     }
 
     public ResponseEntity<?> getCharityData() {
@@ -188,6 +282,47 @@ public class AdminService {
         result.put("donations", donations);
 
         return ResponseEntity.ok(result);
+    }
+
+    public ResponseEntity<?> addManualCharityEntry(Map<String, Object> request) {
+        Long currentUserId = requireCurrentUserId();
+        User currentUser = userRepository.findByIdAndDelFlgFalse(currentUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Current admin not found"));
+
+        String donorName = normalizeText(request.get("donorName"));
+        if (donorName == null) {
+            throw new IllegalArgumentException("donorName is required");
+        }
+
+        Double amount = request.get("amount") != null ? Double.valueOf(request.get("amount").toString()) : null;
+        if (amount == null || amount <= 0) {
+            throw new IllegalArgumentException("Amount must be a positive number");
+        }
+
+        String message = normalizeText(request.get("message"));
+
+        CharityDonation donation = CharityDonation.builder()
+                .donorId(currentUserId)
+                .donorName(donorName)
+                .entrySource("MANUAL")
+                .recordedById(currentUserId)
+                .amount(amount)
+                .message(message != null ? message : "")
+                .build();
+
+        charityDonationRepository.save(donation);
+        adminAuditService.logAction(
+                "CHARITY_ENTRY_CREATED",
+                "CHARITY_DONATION",
+                donation.getId(),
+                "Added manual charity entry for " + donorName,
+                "amount=" + amount + ", recordedBy=" + currentUser.getEmail()
+        );
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Manual charity entry recorded successfully",
+                "donation", donation
+        ));
     }
 
     private double sumCollectedByCategory(List<Payment> payments, String category) {
@@ -243,6 +378,64 @@ public class AdminService {
 
     private boolean isAdminManagedCategory(String category) {
         return category != null && ADMIN_MANAGED_FEE_TYPES.contains(category.toUpperCase());
+    }
+
+    private boolean isReportVisibleCategory(String category) {
+        return category != null && REPORT_VISIBLE_PAYMENT_TYPES.contains(category.toUpperCase(Locale.ROOT));
+    }
+
+    private Long requireCurrentUserId() {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        if (currentUserId == null) {
+            throw new ResourceNotFoundException("Current admin not found");
+        }
+        return currentUserId;
+    }
+
+    private String normalizePaymentStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+
+        String normalized = status.trim().toUpperCase(Locale.ROOT);
+        if (!PAYMENT_STATUSES.contains(normalized)) {
+            throw new IllegalArgumentException("status must be Pending, Paid, or Overdue");
+        }
+
+        return normalized;
+    }
+
+    private Date parseOptionalDate(Object rawValue) {
+        if (rawValue == null || rawValue.toString().isBlank()) {
+            return null;
+        }
+
+        try {
+            return Date.from(Instant.parse(rawValue.toString()));
+        } catch (DateTimeParseException ignored) {
+            try {
+                return java.sql.Date.valueOf(rawValue.toString());
+            } catch (IllegalArgumentException ex) {
+                throw new IllegalArgumentException("paidDate must be an ISO timestamp or yyyy-MM-dd date");
+            }
+        }
+    }
+
+    private String normalizeText(Object rawValue) {
+        if (rawValue == null) {
+            return null;
+        }
+
+        String value = rawValue.toString().trim();
+        return value.isEmpty() ? null : value;
+    }
+
+    private String toTitleCase(String value) {
+        return value.substring(0, 1).toUpperCase(Locale.ROOT) + value.substring(1).toLowerCase(Locale.ROOT);
+    }
+
+    private String safeText(String value) {
+        return value != null ? value : "";
     }
 
     private String normalizeRole(UserRolesEnum role) {

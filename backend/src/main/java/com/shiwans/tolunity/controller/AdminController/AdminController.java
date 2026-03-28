@@ -1,6 +1,7 @@
 package com.shiwans.tolunity.controller.AdminController;
 
 import com.shiwans.tolunity.dto.ComplaintDtos.UpdateComplaintStatusRequest;
+import com.shiwans.tolunity.service.AdminServices.AdminAuditService;
 import com.shiwans.tolunity.service.ComplaintService;
 import com.shiwans.tolunity.service.AdminServices.AdminService;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import java.util.Map;
 public class AdminController {
 
     private final AdminService adminService;
+    private final AdminAuditService adminAuditService;
     private final ComplaintService complaintService;
 
     @GetMapping("/dashboard")
@@ -38,6 +40,11 @@ public class AdminController {
         return adminService.getAllPayments();
     }
 
+    @PutMapping("/payments/{paymentId}/transaction")
+    public ResponseEntity<?> updatePaymentTransaction(@PathVariable Long paymentId, @RequestBody Map<String, Object> request) {
+        return adminService.updatePaymentTransaction(paymentId, request);
+    }
+
     @GetMapping("/fee-config")
     public ResponseEntity<?> getFeeConfigs() {
         return adminService.getFeeConfigs();
@@ -56,6 +63,16 @@ public class AdminController {
     @GetMapping("/charity")
     public ResponseEntity<?> getCharityData() {
         return adminService.getCharityData();
+    }
+
+    @PostMapping("/charity/manual")
+    public ResponseEntity<?> addManualCharityEntry(@RequestBody Map<String, Object> request) {
+        return adminService.addManualCharityEntry(request);
+    }
+
+    @GetMapping("/audit-logs")
+    public ResponseEntity<?> getAuditLogs() {
+        return adminAuditService.getAuditLogs();
     }
 
     @GetMapping("/complaints")

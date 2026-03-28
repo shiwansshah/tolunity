@@ -21,6 +21,11 @@ public class PaymentController {
         return paymentService.getPayments();
     }
 
+    @GetMapping("/gateway-config")
+    public ResponseEntity<?> getGatewayConfig() {
+        return paymentService.getGatewayConfig();
+    }
+
     @PostMapping("/pay/{paymentId}")
     public ResponseEntity<?> payBill(@PathVariable Long paymentId) {
         return paymentService.payBill(paymentId);
@@ -44,6 +49,16 @@ public class PaymentController {
             @RequestParam String failureUrl
     ) {
         return paymentService.getEsewaRedirectPage(paymentId, transactionUuid, successUrl, failureUrl);
+    }
+
+    @GetMapping(value = "/pay/{paymentId}/esewa-callback", produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> getEsewaCallbackPage(
+            @PathVariable Long paymentId,
+            @RequestParam String redirectUrl,
+            @RequestParam(defaultValue = "return") String outcome,
+            @RequestParam Map<String, String> queryParams
+    ) {
+        return paymentService.getEsewaCallbackPage(paymentId, redirectUrl, outcome, queryParams);
     }
 
     @PostMapping("/create-bill")

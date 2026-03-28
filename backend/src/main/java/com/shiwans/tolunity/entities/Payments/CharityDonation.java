@@ -25,6 +25,12 @@ public class CharityDonation {
     @Column(name = "donor_name")
     private String donorName;
 
+    @Column(name = "entry_source")
+    private String entrySource;
+
+    @Column(name = "recorded_by_id")
+    private Long recordedById;
+
     @Column(nullable = false)
     private Double amount;
 

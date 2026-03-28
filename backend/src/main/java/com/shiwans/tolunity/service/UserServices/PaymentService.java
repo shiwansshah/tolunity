@@ -23,6 +23,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -87,6 +88,13 @@ public class PaymentService {
                 .toList();
 
         return ResponseEntity.ok(paymentDtoMapper.toDtos(visiblePayments));
+    }
+
+    public ResponseEntity<?> getGatewayConfig() {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("esewaEnabled", isEsewaConfigured());
+        response.put("khaltiEnabled", isKhaltiConfigured());
+        return ResponseEntity.ok(response);
     }
 
     public ResponseEntity<?> payBill(Long paymentId) {
@@ -186,6 +194,9 @@ public class PaymentService {
             throw new IllegalArgumentException("Invalid eSewa transaction reference");
         }
 
+        validateHttpUrl(successUrl, "successUrl");
+        validateHttpUrl(failureUrl, "failureUrl");
+
         String totalAmount = formatAmount(payment.getAmount());
         String signaturePayload = "total_amount=" + totalAmount
                 + ",transaction_uuid=" + transactionUuid
@@ -230,6 +241,62 @@ public class PaymentService {
         return ResponseEntity.ok(html);
     }
 
+    public ResponseEntity<String> getEsewaCallbackPage(Long paymentId, String redirectUrl, String outcome, Map<String, String> queryParams) {
+        Payment payment = paymentRepository.findByIdAndDelFlgFalse(paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment with ID " + paymentId + " not found"));
+
+        validateAppRedirectUrl(redirectUrl);
+
+        Map<String, Object> verification = attemptEsewaCallbackVerification(payment, queryParams);
+        boolean verified = Boolean.TRUE.equals(verification.get("verified"));
+        String gatewayStatus = stringOrDefault(verification.get("status"), payment.getGatewayStatus());
+        String resolvedOutcome = verified ? "success" : outcome;
+        String redirectTarget = appendQueryParam(redirectUrl, "paymentId", paymentId.toString());
+        redirectTarget = appendQueryParam(redirectTarget, "gatewayStatus", gatewayStatus != null ? gatewayStatus : "UNKNOWN");
+
+        boolean success = "success".equalsIgnoreCase(resolvedOutcome);
+        String title = success ? "Returning to TolUnity" : "Payment Not Completed";
+        String message = success
+                ? "eSewa returned successfully. TolUnity has checked the latest gateway status."
+                : "eSewa did not complete the payment. Return to the app to review the latest gateway status.";
+
+        String html = """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                  <meta charset="utf-8" />
+                  <meta name="viewport" content="width=device-width, initial-scale=1" />
+                  <title>%s</title>
+                </head>
+                <body style="margin:0; font-family: Arial, sans-serif; background:#f3f6fc; color:#1a1d2e;">
+                  <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;">
+                    <div style="max-width:420px; width:100%%; background:#ffffff; border-radius:20px; padding:32px; box-shadow:0 18px 40px rgba(30,63,160,0.14); text-align:center;">
+                      <p style="margin:0 0 12px; color:#1e3fa0; font-size:13px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;">TolUnity Payment</p>
+                      <h1 style="margin:0 0 12px; font-size:24px; line-height:1.2;">%s</h1>
+                      <p style="margin:0 0 24px; color:#5a6589; line-height:1.6;">%s</p>
+                      <a href="%s" style="display:inline-block; padding:14px 22px; border-radius:999px; background:#1e3fa0; color:#ffffff; text-decoration:none; font-weight:700;">Open TolUnity</a>
+                    </div>
+                  </div>
+                  <script>
+                    window.location.replace("%s");
+                    setTimeout(function () {
+                      window.location.href = "%s";
+                    }, 800);
+                  </script>
+                </body>
+                </html>
+                """.formatted(
+                escapeHtml(title),
+                escapeHtml(title),
+                escapeHtml(message),
+                escapeHtml(redirectTarget),
+                escapeHtml(redirectTarget),
+                escapeHtml(redirectTarget)
+        );
+
+        return ResponseEntity.ok(html);
+    }
+
     public ResponseEntity<?> donateToCharity(Map<String, Object> request) {
         Long currentUserId = getCurrentUserId();
         User currentUser = getCurrentUser(currentUserId);
@@ -244,6 +311,8 @@ public class PaymentService {
         CharityDonation donation = CharityDonation.builder()
                 .donorId(currentUserId)
                 .donorName(currentUser.getName())
+                .entrySource("APP")
+                .recordedById(currentUserId)
                 .amount(amount)
                 .message(message != null ? message : "")
                 .build();
@@ -304,16 +373,20 @@ public class PaymentService {
     private Map<String, Object> initiateEsewa(Payment payment, Map<String, Object> request) {
         String transactionUuid = "tolunity-" + payment.getId() + "-" + System.currentTimeMillis();
         String totalAmount = formatAmount(payment.getAmount());
-        String successUrl = stringOrDefault(request.get("successUrl"), stringOrDefault(request.get("returnUrl"), "tolunity://payments/esewa/success"));
-        String failureUrl = stringOrDefault(request.get("failureUrl"), stringOrDefault(request.get("returnUrl"), "tolunity://payments/esewa/failure"));
+        String successUrl = stringOrDefault(request.get("successUrl"), stringOrDefault(request.get("returnUrl"), "http://localhost:8080/api/payments/esewa-success"));
+        String failureUrl = stringOrDefault(request.get("failureUrl"), stringOrDefault(request.get("returnUrl"), "http://localhost:8080/api/payments/esewa-failure"));
         String signedFieldNames = "total_amount,transaction_uuid,product_code";
         String signaturePayload = "total_amount=" + totalAmount
                 + ",transaction_uuid=" + transactionUuid
                 + ",product_code=" + esewaProductCode;
 
+        validateHttpUrl(successUrl, "successUrl");
+        validateHttpUrl(failureUrl, "failureUrl");
+
         payment.setGatewayProvider("ESEWA");
         payment.setGatewayTransactionId(transactionUuid);
         payment.setGatewayStatus("INITIATED");
+        payment.setStatusUpdatedAt(new Date());
         paymentRepository.save(payment);
 
         Map<String, Object> formFields = new LinkedHashMap<>();
@@ -342,7 +415,7 @@ public class PaymentService {
 
     private Map<String, Object> initiateKhalti(Payment payment, User currentUser, Map<String, Object> request) {
         if (khaltiSecretKey == null || khaltiSecretKey.isBlank()) {
-            throw new IllegalArgumentException("Khalti sandbox secret key is not configured");
+            throw new IllegalArgumentException("Khalti secret key is not configured. Set KHALTI_SECRET_KEY in the backend environment.");
         }
 
         String returnUrl = stringOrDefault(request.get("returnUrl"), "tolunity://payments/khalti");
@@ -378,6 +451,7 @@ public class PaymentService {
         payment.setGatewayProvider("KHALTI");
         payment.setGatewayTransactionId(pidx);
         payment.setGatewayStatus("INITIATED");
+        payment.setStatusUpdatedAt(new Date());
         paymentRepository.save(payment);
 
         Map<String, Object> response = new LinkedHashMap<>();
@@ -411,6 +485,7 @@ public class PaymentService {
         payment.setGatewayTransactionId(transactionUuid);
         payment.setGatewayReferenceId(referenceId);
         payment.setGatewayStatus(status);
+        payment.setStatusUpdatedAt(new Date());
 
         if ("COMPLETE".equalsIgnoreCase(status)) {
             markPaymentAsPaid(payment);
@@ -429,7 +504,7 @@ public class PaymentService {
 
     private Map<String, Object> verifyKhalti(Payment payment, Map<String, Object> request) {
         if (khaltiSecretKey == null || khaltiSecretKey.isBlank()) {
-            throw new IllegalArgumentException("Khalti sandbox secret key is not configured");
+            throw new IllegalArgumentException("Khalti secret key is not configured. Set KHALTI_SECRET_KEY in the backend environment.");
         }
 
         String pidx = stringOrDefault(request.get("pidx"), payment.getGatewayTransactionId());
@@ -453,6 +528,7 @@ public class PaymentService {
         payment.setGatewayTransactionId(pidx);
         payment.setGatewayReferenceId(referenceId);
         payment.setGatewayStatus(status);
+        payment.setStatusUpdatedAt(new Date());
 
         if ("Completed".equalsIgnoreCase(status)) {
             markPaymentAsPaid(payment);
@@ -472,6 +548,7 @@ public class PaymentService {
     private void markPaymentAsPaid(Payment payment) {
         payment.setStatus("Paid");
         payment.setPaidDate(new Date());
+        payment.setStatusUpdatedAt(new Date());
         paymentRepository.save(payment);
     }
 
@@ -563,6 +640,84 @@ public class PaymentService {
         }
         String text = value.toString().trim();
         return text.isEmpty() ? defaultValue : text;
+    }
+
+    private Map<String, Object> attemptEsewaCallbackVerification(Payment payment, Map<String, String> queryParams) {
+        try {
+            String transactionUuid = payment.getGatewayTransactionId();
+            String totalAmount = formatAmount(payment.getAmount());
+
+            if (queryParams != null) {
+                Map<String, Object> callbackData = decodeEsewaCallbackData(queryParams.get("data"));
+                transactionUuid = stringOrDefault(callbackData.get("transaction_uuid"), transactionUuid);
+                totalAmount = stringOrDefault(callbackData.get("total_amount"), totalAmount);
+            }
+
+            return verifyEsewa(payment, Map.of(
+                    "gateway", "ESEWA",
+                    "transactionUuid", transactionUuid,
+                    "totalAmount", totalAmount
+            ));
+        } catch (Exception ex) {
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("verified", false);
+            response.put("status", payment.getGatewayStatus() != null ? payment.getGatewayStatus() : "INITIATED");
+            return response;
+        }
+    }
+
+    private Map<String, Object> decodeEsewaCallbackData(String encodedData) {
+        if (encodedData == null || encodedData.isBlank()) {
+            return Collections.emptyMap();
+        }
+
+        try {
+            byte[] decoded = Base64.getDecoder().decode(encodedData);
+            return objectMapper.readValue(decoded, new TypeReference<>() {});
+        } catch (Exception ex) {
+            return Collections.emptyMap();
+        }
+    }
+
+    private String appendQueryParam(String baseUrl, String key, String value) {
+        String delimiter = baseUrl.contains("?") ? "&" : "?";
+        return baseUrl + delimiter + encode(key) + "=" + encode(value);
+    }
+
+    private boolean isEsewaConfigured() {
+        return esewaFormUrl != null && !esewaFormUrl.isBlank()
+                && esewaStatusUrl != null && !esewaStatusUrl.isBlank()
+                && esewaProductCode != null && !esewaProductCode.isBlank()
+                && esewaSecretKey != null && !esewaSecretKey.isBlank();
+    }
+
+    private boolean isKhaltiConfigured() {
+        return khaltiBaseUrl != null && !khaltiBaseUrl.isBlank()
+                && khaltiSecretKey != null && !khaltiSecretKey.isBlank();
+    }
+
+    private void validateHttpUrl(String value, String fieldName) {
+        try {
+            URI uri = new URI(value);
+            String scheme = uri.getScheme();
+            if (scheme == null || (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))) {
+                throw new IllegalArgumentException(fieldName + " must use http or https");
+            }
+        } catch (URISyntaxException ex) {
+            throw new IllegalArgumentException(fieldName + " is not a valid URL");
+        }
+    }
+
+    private void validateAppRedirectUrl(String value) {
+        try {
+            URI uri = new URI(value);
+            String scheme = uri.getScheme();
+            if (scheme == null || (!"tolunitymob".equalsIgnoreCase(scheme) && !"tolunity".equalsIgnoreCase(scheme))) {
+                throw new IllegalArgumentException("redirectUrl must use a supported TolUnity app scheme");
+            }
+        } catch (URISyntaxException ex) {
+            throw new IllegalArgumentException("redirectUrl is not a valid URL");
+        }
     }
 
     private String escapeHtml(String value) {
