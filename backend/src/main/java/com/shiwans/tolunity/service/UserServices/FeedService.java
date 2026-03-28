@@ -15,6 +15,8 @@ import com.shiwans.tolunity.entities.UserEntities.UserFeed.PostComment;
 import com.shiwans.tolunity.entities.UserEntities.UserFeed.PostLike;
 import com.shiwans.tolunity.entities.UserEntities.UserFeed.PostMedia;
 import com.shiwans.tolunity.enums.MediaTypeEnum;
+import com.shiwans.tolunity.enums.NotificationTypeEnum;
+import com.shiwans.tolunity.service.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -48,6 +50,9 @@ public class FeedService {
 
     @Autowired
     private PostCommentRepository postCommentRepository;
+
+    @Autowired
+    private NotificationService notificationService;
     
     @Transactional
     public ResponseEntity<?> createPost(CreatePostRequest request) {
@@ -304,6 +309,7 @@ public class FeedService {
                 postLikeRepository.save(like);
 
                 post.setPostLikes(post.getPostLikes() + 1);
+                notificationService.notifyPostInteraction(user.getId(), post.getUser().getId(), NotificationTypeEnum.LIKE);
 
                 response.put("liked", true);
                 response.put("message", "Post liked");
@@ -349,6 +355,7 @@ public class FeedService {
 
             post.setPostComments(post.getPostComments() + 1);
             postRepository.save(post);
+            notificationService.notifyPostInteraction(user.getId(), post.getUser().getId(), NotificationTypeEnum.COMMENT);
 
             return ResponseEntity.ok(Map.of("message", "Comment created"));
 

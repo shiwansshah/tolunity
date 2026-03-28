@@ -3,15 +3,18 @@ package com.shiwans.tolunity.service.UserServices;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shiwans.tolunity.Repo.AdminRepos.CharityDonationRepository;
+import com.shiwans.tolunity.Repo.UserRepos.CharityPaymentSessionRepository;
 import com.shiwans.tolunity.Repo.UserRepos.PaymentRepository;
 import com.shiwans.tolunity.Repo.UserRepository;
 import com.shiwans.tolunity.Util.SecurityUtil;
 import com.shiwans.tolunity.config.AccessDeniedException;
 import com.shiwans.tolunity.config.ResourceNotFoundException;
 import com.shiwans.tolunity.entities.Payments.CharityDonation;
+import com.shiwans.tolunity.entities.Payments.CharityPaymentSession;
 import com.shiwans.tolunity.entities.Payments.Payment;
 import com.shiwans.tolunity.entities.User;
 import com.shiwans.tolunity.enums.UserTypeEnum;
+import com.shiwans.tolunity.service.NotificationService;
 import com.shiwans.tolunity.service.PaymentDtoMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,8 +43,10 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
     private final CharityDonationRepository charityDonationRepository;
+    private final CharityPaymentSessionRepository charityPaymentSessionRepository;
     private final PaymentDtoMapper paymentDtoMapper;
     private final ObjectMapper objectMapper;
+    private final NotificationService notificationService;
 
     @Value("${app.payments.khalti.base-url}")
     private String khaltiBaseUrl;
@@ -155,6 +160,7 @@ public class PaymentService {
         payment.setPayerId(payerId);
 
         paymentRepository.save(payment);
+        notificationService.notifyRentSet(payerId);
 
         return ResponseEntity.ok(Map.of("message", "Rent bill created successfully"));
     }
@@ -318,8 +324,119 @@ public class PaymentService {
                 .build();
 
         charityDonationRepository.save(donation);
+        notificationService.notifyGlobalDonation("charity-direct:" + donation.getId());
 
         return ResponseEntity.ok(Map.of("message", "Thank you for your donation of NPR " + amount.intValue()));
+    }
+
+    public ResponseEntity<?> initiateCharityDonation(Map<String, Object> request) {
+        Long currentUserId = getCurrentUserId();
+        User currentUser = getCurrentUser(currentUserId);
+
+        String gateway = resolveGateway((String) request.get("gateway"));
+        if (!"ESEWA".equals(gateway)) {
+            throw new IllegalArgumentException("Charity donation currently supports eSewa only");
+        }
+
+        Double amount = request.get("amount") != null ? Double.valueOf(request.get("amount").toString()) : null;
+        if (amount == null || amount <= 0) {
+            throw new IllegalArgumentException("Donation amount must be a positive number");
+        }
+
+        String message = stringOrDefault(request.get("message"), "");
+        String transactionUuid = "charity-" + currentUserId + "-" + System.currentTimeMillis();
+
+        CharityPaymentSession session = CharityPaymentSession.builder()
+                .donorId(currentUserId)
+                .donorName(currentUser.getName())
+                .amount(amount)
+                .message(message)
+                .gatewayProvider("ESEWA")
+                .gatewayTransactionId(transactionUuid)
+                .gatewayStatus("INITIATED")
+                .build();
+
+        charityPaymentSessionRepository.save(session);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("gateway", "ESEWA");
+        response.put("sessionId", session.getId());
+        response.put("transactionUuid", transactionUuid);
+        response.put("amount", amount);
+        return ResponseEntity.ok(response);
+    }
+
+    public ResponseEntity<?> verifyCharityDonation(Long sessionId, Map<String, Object> request) {
+        CharityPaymentSession session = validateCharitySessionAccess(sessionId);
+        String transactionUuid = stringOrDefault(request.get("transactionUuid"), session.getGatewayTransactionId());
+        if (transactionUuid == null || transactionUuid.isBlank()) {
+            throw new IllegalArgumentException("transactionUuid is required for eSewa verification");
+        }
+
+        String totalAmount = stringOrDefault(request.get("totalAmount"), formatAmount(session.getAmount()));
+        String url = esewaStatusUrl
+                + "?product_code=" + encode(esewaProductCode)
+                + "&total_amount=" + encode(totalAmount)
+                + "&transaction_uuid=" + encode(transactionUuid);
+
+        Map<String, Object> responseMap = getJson(url, Collections.emptyMap());
+        String status = stringOrDefault(responseMap.get("status"), "UNKNOWN");
+        String referenceId = stringOrDefault(responseMap.get("refId"), null);
+
+        session.setGatewayProvider("ESEWA");
+        session.setGatewayTransactionId(transactionUuid);
+        session.setGatewayReferenceId(referenceId);
+        session.setGatewayStatus(status);
+        charityPaymentSessionRepository.save(session);
+
+        if ("COMPLETE".equalsIgnoreCase(status) && createCharityDonationFromSession(session, referenceId, status)) {
+            notificationService.notifyGlobalDonation("charity-session:" + session.getGatewayTransactionId());
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("gateway", "ESEWA");
+        response.put("verified", "COMPLETE".equalsIgnoreCase(status));
+        response.put("status", status);
+        response.put("referenceId", referenceId);
+        return ResponseEntity.ok(response);
+    }
+
+    public ResponseEntity<String> getCharityEsewaRedirectPage(Long sessionId, String transactionUuid, String successUrl, String failureUrl) {
+        CharityPaymentSession session = charityPaymentSessionRepository.findByIdAndDelFlgFalse(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Charity payment session with ID " + sessionId + " not found"));
+
+        if (!"ESEWA".equalsIgnoreCase(session.getGatewayProvider())
+                || session.getGatewayTransactionId() == null
+                || !session.getGatewayTransactionId().equals(transactionUuid)) {
+            throw new IllegalArgumentException("Invalid charity eSewa transaction reference");
+        }
+
+        validateHttpUrl(successUrl, "successUrl");
+        validateHttpUrl(failureUrl, "failureUrl");
+
+        return ResponseEntity.ok(buildEsewaRedirectHtml(session.getAmount(), transactionUuid, successUrl, failureUrl));
+    }
+
+    public ResponseEntity<String> getCharityEsewaCallbackPage(Long sessionId, String redirectUrl, String outcome, Map<String, String> queryParams) {
+        CharityPaymentSession session = charityPaymentSessionRepository.findByIdAndDelFlgFalse(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Charity payment session with ID " + sessionId + " not found"));
+
+        validateAppRedirectUrl(redirectUrl);
+
+        Map<String, Object> verification = attemptCharityEsewaCallbackVerification(session, queryParams);
+        boolean verified = Boolean.TRUE.equals(verification.get("verified"));
+        String gatewayStatus = stringOrDefault(verification.get("status"), session.getGatewayStatus());
+        String resolvedOutcome = verified ? "success" : outcome;
+        String redirectTarget = appendQueryParam(redirectUrl, "sessionId", sessionId.toString());
+        redirectTarget = appendQueryParam(redirectTarget, "gatewayStatus", gatewayStatus != null ? gatewayStatus : "UNKNOWN");
+
+        boolean success = "success".equalsIgnoreCase(resolvedOutcome);
+        String title = success ? "Returning to TolUnity" : "Donation Not Completed";
+        String message = success
+                ? "eSewa returned successfully. TolUnity has checked the latest charity donation status."
+                : "eSewa did not complete the donation. Return to the app to review the latest gateway status.";
+
+        return ResponseEntity.ok(buildAppRedirectHtml(title, message, redirectTarget));
     }
 
     private Long getCurrentUserId() {
@@ -353,6 +470,18 @@ public class PaymentService {
         return payment;
     }
 
+    private CharityPaymentSession validateCharitySessionAccess(Long sessionId) {
+        Long currentUserId = getCurrentUserId();
+        CharityPaymentSession session = charityPaymentSessionRepository.findByIdAndDelFlgFalse(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Charity payment session with ID " + sessionId + " not found"));
+
+        if (!currentUserId.equals(session.getDonorId())) {
+            throw new AccessDeniedException("You are not authorized to verify this charity donation");
+        }
+
+        return session;
+    }
+
     private boolean isUserVisibleCategory(String category) {
         return category != null && USER_VISIBLE_CATEGORIES.contains(category.toUpperCase(Locale.ROOT));
     }
@@ -372,13 +501,8 @@ public class PaymentService {
 
     private Map<String, Object> initiateEsewa(Payment payment, Map<String, Object> request) {
         String transactionUuid = "tolunity-" + payment.getId() + "-" + System.currentTimeMillis();
-        String totalAmount = formatAmount(payment.getAmount());
         String successUrl = stringOrDefault(request.get("successUrl"), stringOrDefault(request.get("returnUrl"), "http://localhost:8080/api/payments/esewa-success"));
         String failureUrl = stringOrDefault(request.get("failureUrl"), stringOrDefault(request.get("returnUrl"), "http://localhost:8080/api/payments/esewa-failure"));
-        String signedFieldNames = "total_amount,transaction_uuid,product_code";
-        String signaturePayload = "total_amount=" + totalAmount
-                + ",transaction_uuid=" + transactionUuid
-                + ",product_code=" + esewaProductCode;
 
         validateHttpUrl(successUrl, "successUrl");
         validateHttpUrl(failureUrl, "failureUrl");
@@ -389,18 +513,7 @@ public class PaymentService {
         payment.setStatusUpdatedAt(new Date());
         paymentRepository.save(payment);
 
-        Map<String, Object> formFields = new LinkedHashMap<>();
-        formFields.put("amount", totalAmount);
-        formFields.put("tax_amount", "0");
-        formFields.put("total_amount", totalAmount);
-        formFields.put("transaction_uuid", transactionUuid);
-        formFields.put("product_code", esewaProductCode);
-        formFields.put("product_service_charge", "0");
-        formFields.put("product_delivery_charge", "0");
-        formFields.put("success_url", successUrl);
-        formFields.put("failure_url", failureUrl);
-        formFields.put("signed_field_names", signedFieldNames);
-        formFields.put("signature", createEsewaSignature(signaturePayload));
+        Map<String, Object> formFields = buildEsewaFormFields(payment.getAmount(), transactionUuid, successUrl, failureUrl);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("gateway", "ESEWA");
@@ -546,10 +659,140 @@ public class PaymentService {
     }
 
     private void markPaymentAsPaid(Payment payment) {
+        boolean newlyPaid = !"Paid".equalsIgnoreCase(payment.getStatus());
         payment.setStatus("Paid");
         payment.setPaidDate(new Date());
         payment.setStatusUpdatedAt(new Date());
         paymentRepository.save(payment);
+
+        if (newlyPaid && "RENT".equalsIgnoreCase(payment.getCategory())) {
+            notificationService.notifyRentPaid(payment.getPayeeId(), payment.getId());
+        }
+    }
+
+    private boolean createCharityDonationFromSession(CharityPaymentSession session, String referenceId, String gatewayStatus) {
+        java.util.Optional<CharityDonation> existingDonation = charityDonationRepository
+                .findByGatewayTransactionIdAndDelFlgFalse(session.getGatewayTransactionId());
+        boolean newlyCompleted = existingDonation.isEmpty()
+                || !"COMPLETE".equalsIgnoreCase(existingDonation.get().getGatewayStatus());
+
+        CharityDonation donation = existingDonation.orElseGet(() -> CharityDonation.builder()
+                        .donorId(session.getDonorId())
+                        .donorName(session.getDonorName())
+                        .entrySource("APP")
+                        .recordedById(session.getDonorId())
+                        .amount(session.getAmount())
+                        .message(session.getMessage() != null ? session.getMessage() : "")
+                        .gatewayProvider("ESEWA")
+                        .gatewayTransactionId(session.getGatewayTransactionId())
+                        .build());
+
+        donation.setGatewayProvider("ESEWA");
+        donation.setGatewayReferenceId(referenceId);
+        donation.setGatewayStatus(gatewayStatus);
+        donation.setPaidDate(new Date());
+        charityDonationRepository.save(donation);
+        return newlyCompleted;
+    }
+
+    private Map<String, Object> buildEsewaFormFields(Double amount, String transactionUuid, String successUrl, String failureUrl) {
+        String totalAmount = formatAmount(amount);
+        String signedFieldNames = "total_amount,transaction_uuid,product_code";
+        String signaturePayload = "total_amount=" + totalAmount
+                + ",transaction_uuid=" + transactionUuid
+                + ",product_code=" + esewaProductCode;
+
+        Map<String, Object> formFields = new LinkedHashMap<>();
+        formFields.put("amount", totalAmount);
+        formFields.put("tax_amount", "0");
+        formFields.put("total_amount", totalAmount);
+        formFields.put("transaction_uuid", transactionUuid);
+        formFields.put("product_code", esewaProductCode);
+        formFields.put("product_service_charge", "0");
+        formFields.put("product_delivery_charge", "0");
+        formFields.put("success_url", successUrl);
+        formFields.put("failure_url", failureUrl);
+        formFields.put("signed_field_names", signedFieldNames);
+        formFields.put("signature", createEsewaSignature(signaturePayload));
+        return formFields;
+    }
+
+    private String buildEsewaRedirectHtml(Double amount, String transactionUuid, String successUrl, String failureUrl) {
+        Map<String, Object> formFields = buildEsewaFormFields(amount, transactionUuid, successUrl, failureUrl);
+        String totalAmount = formatAmount(amount);
+
+        return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                  <meta charset="utf-8" />
+                  <meta name="viewport" content="width=device-width, initial-scale=1" />
+                  <title>Redirecting to eSewa</title>
+                </head>
+                <body style="font-family: Arial, sans-serif; padding: 24px;">
+                  <p>Redirecting to eSewa sandbox...</p>
+                  <form id="esewaForm" action="%s" method="POST">
+                    <input type="hidden" name="amount" value="%s" />
+                    <input type="hidden" name="tax_amount" value="0" />
+                    <input type="hidden" name="total_amount" value="%s" />
+                    <input type="hidden" name="transaction_uuid" value="%s" />
+                    <input type="hidden" name="product_code" value="%s" />
+                    <input type="hidden" name="product_service_charge" value="0" />
+                    <input type="hidden" name="product_delivery_charge" value="0" />
+                    <input type="hidden" name="success_url" value="%s" />
+                    <input type="hidden" name="failure_url" value="%s" />
+                    <input type="hidden" name="signed_field_names" value="total_amount,transaction_uuid,product_code" />
+                    <input type="hidden" name="signature" value="%s" />
+                  </form>
+                  <script>document.getElementById('esewaForm').submit();</script>
+                </body>
+                </html>
+                """.formatted(
+                escapeHtml(esewaFormUrl),
+                escapeHtml(totalAmount),
+                escapeHtml(totalAmount),
+                escapeHtml(transactionUuid),
+                escapeHtml(esewaProductCode),
+                escapeHtml(successUrl),
+                escapeHtml(failureUrl),
+                escapeHtml(formFields.get("signature").toString())
+        );
+    }
+
+    private String buildAppRedirectHtml(String title, String message, String redirectTarget) {
+        return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                  <meta charset="utf-8" />
+                  <meta name="viewport" content="width=device-width, initial-scale=1" />
+                  <title>%s</title>
+                </head>
+                <body style="margin:0; font-family: Arial, sans-serif; background:#f3f6fc; color:#1a1d2e;">
+                  <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;">
+                    <div style="max-width:420px; width:100%%; background:#ffffff; border-radius:20px; padding:32px; box-shadow:0 18px 40px rgba(30,63,160,0.14); text-align:center;">
+                      <p style="margin:0 0 12px; color:#1e3fa0; font-size:13px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;">TolUnity Payment</p>
+                      <h1 style="margin:0 0 12px; font-size:24px; line-height:1.2;">%s</h1>
+                      <p style="margin:0 0 24px; color:#5a6589; line-height:1.6;">%s</p>
+                      <a href="%s" style="display:inline-block; padding:14px 22px; border-radius:999px; background:#1e3fa0; color:#ffffff; text-decoration:none; font-weight:700;">Open TolUnity</a>
+                    </div>
+                  </div>
+                  <script>
+                    window.location.replace("%s");
+                    setTimeout(function () {
+                      window.location.href = "%s";
+                    }, 800);
+                  </script>
+                </body>
+                </html>
+                """.formatted(
+                escapeHtml(title),
+                escapeHtml(title),
+                escapeHtml(message),
+                escapeHtml(redirectTarget),
+                escapeHtml(redirectTarget),
+                escapeHtml(redirectTarget)
+        );
     }
 
     private String createEsewaSignature(String payload) {
@@ -662,6 +905,37 @@ public class PaymentService {
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("verified", false);
             response.put("status", payment.getGatewayStatus() != null ? payment.getGatewayStatus() : "INITIATED");
+            return response;
+        }
+    }
+
+    private Map<String, Object> attemptCharityEsewaCallbackVerification(CharityPaymentSession session, Map<String, String> queryParams) {
+        try {
+            String transactionUuid = session.getGatewayTransactionId();
+            String totalAmount = formatAmount(session.getAmount());
+
+            if (queryParams != null) {
+                Map<String, Object> callbackData = decodeEsewaCallbackData(queryParams.get("data"));
+                transactionUuid = stringOrDefault(callbackData.get("transaction_uuid"), transactionUuid);
+                totalAmount = stringOrDefault(callbackData.get("total_amount"), totalAmount);
+            }
+
+            ResponseEntity<?> responseEntity = verifyCharityDonation(session.getId(), Map.of(
+                    "gateway", "ESEWA",
+                    "transactionUuid", transactionUuid,
+                    "totalAmount", totalAmount
+            ));
+            Object body = responseEntity.getBody();
+            if (body instanceof Map<?, ?> bodyMap) {
+                Map<String, Object> response = new LinkedHashMap<>();
+                bodyMap.forEach((key, value) -> response.put(String.valueOf(key), value));
+                return response;
+            }
+            return Collections.emptyMap();
+        } catch (Exception ex) {
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("verified", false);
+            response.put("status", session.getGatewayStatus() != null ? session.getGatewayStatus() : "INITIATED");
             return response;
         }
     }

@@ -76,6 +76,7 @@ public class AuthService {
             userRepository.save(authenticatedUser);
 
             LoginResponseDto response = new LoginResponseDto();
+            response.setId(authenticatedUser.getId());
             response.setToken(token);
             response.setName(authenticatedUser.getName());
             response.setEmail(authenticatedUser.getEmail());

@@ -61,6 +61,36 @@ public class PaymentController {
         return paymentService.getEsewaCallbackPage(paymentId, redirectUrl, outcome, queryParams);
     }
 
+    @PostMapping("/charity/initiate")
+    public ResponseEntity<?> initiateCharityDonation(@RequestBody Map<String, Object> request) {
+        return paymentService.initiateCharityDonation(request);
+    }
+
+    @PostMapping("/charity/{sessionId}/verify")
+    public ResponseEntity<?> verifyCharityDonation(@PathVariable Long sessionId, @RequestBody Map<String, Object> request) {
+        return paymentService.verifyCharityDonation(sessionId, request);
+    }
+
+    @GetMapping(value = "/charity/{sessionId}/esewa-redirect", produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> getCharityEsewaRedirectPage(
+            @PathVariable Long sessionId,
+            @RequestParam String transactionUuid,
+            @RequestParam String successUrl,
+            @RequestParam String failureUrl
+    ) {
+        return paymentService.getCharityEsewaRedirectPage(sessionId, transactionUuid, successUrl, failureUrl);
+    }
+
+    @GetMapping(value = "/charity/{sessionId}/esewa-callback", produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> getCharityEsewaCallbackPage(
+            @PathVariable Long sessionId,
+            @RequestParam String redirectUrl,
+            @RequestParam(defaultValue = "return") String outcome,
+            @RequestParam Map<String, String> queryParams
+    ) {
+        return paymentService.getCharityEsewaCallbackPage(sessionId, redirectUrl, outcome, queryParams);
+    }
+
     @PostMapping("/create-bill")
     public ResponseEntity<?> createBill(@RequestBody Map<String, Object> request) {
         return paymentService.createBill(request);

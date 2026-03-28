@@ -22,6 +22,11 @@ public class UserProfileController {
         return userService.updateProfilePic(profilePicUrl);
     }
 
+    @GetMapping("/profile")
+    public ResponseEntity<?> getCurrentUserProfile() {
+        return userService.getCurrentUserProfile();
+    }
+
     @PostMapping("/profile/update")
     public ResponseEntity<?> updateProfile(@RequestBody Map<String, String> request) {
         String name = request.get("name");

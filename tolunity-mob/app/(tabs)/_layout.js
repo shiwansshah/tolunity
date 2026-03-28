@@ -1,10 +1,10 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../src/context/AuthContext';
+import { useNotifications } from '../../src/context/NotificationContext';
 import { COLORS, FONTS, SPACING, SHADOWS } from '../../src/styles/theme';
 
-function TabBarIcon({ name, color, focused }) {
+function TabBarIcon({ name, focused, badgeCount = 0 }) {
   return (
     <View style={[styles.iconWrap, focused && styles.iconWrapFocused]}>
       <Ionicons
@@ -12,11 +12,18 @@ function TabBarIcon({ name, color, focused }) {
         size={22}
         color={focused ? COLORS.primary : COLORS.tabBarInactive}
       />
+      {badgeCount > 0 && (
+        <View style={styles.badge}>
+          <Ionicons name="ellipse" size={8} color="#E53935" />
+        </View>
+      )}
     </View>
   );
 }
 
 export default function TabsLayout() {
+  const { unreadCount } = useNotifications();
+
   return (
     <Tabs
       screenOptions={{
@@ -60,7 +67,7 @@ export default function TabsLayout() {
         options={{
           title: 'Alerts',
           tabBarIcon: ({ focused }) => (
-            <TabBarIcon name="notifications" focused={focused} />
+            <TabBarIcon name="notifications" focused={focused} badgeCount={unreadCount} />
           ),
         }}
       />
@@ -121,5 +128,10 @@ const styles = StyleSheet.create({
   },
   iconWrapFocused: {
     backgroundColor: '#EEF2FF',
+  },
+  badge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
   },
 });

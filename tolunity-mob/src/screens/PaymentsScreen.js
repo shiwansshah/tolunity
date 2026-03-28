@@ -15,10 +15,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import { API_BASE_URL } from '../utils/constants';
 import { getOwners, selectOwner, getMyTenants, removeTenant, hasOwner } from '../api/userApi';
-import { getMyPayments, getGatewayConfig, initiatePayment, verifyPayment, createBill, donateToCharity } from '../api/paymentApi';
+import { getMyPayments, getGatewayConfig, initiatePayment, verifyPayment, createBill, initiateCharityDonation, verifyCharityDonation } from '../api/paymentApi';
 import { getApiErrorMessage } from '../api/apiError';
 
 const APP_PAYMENT_URL = 'tolunitymob://payments';
@@ -53,6 +54,10 @@ const getStatusStyle = (status) => {
 const buildEsewaCallbackUrl = (paymentId, outcome) => {
   const appRedirectUrl = `${APP_PAYMENT_URL}/esewa-${outcome}?paymentId=${paymentId}`;
   return `${API_BASE_URL}/payments/pay/${paymentId}/esewa-callback?redirectUrl=${encodeURIComponent(appRedirectUrl)}&outcome=${encodeURIComponent(outcome)}`;
+};
+const buildCharityEsewaCallbackUrl = (sessionId, outcome) => {
+  const appRedirectUrl = `${APP_PAYMENT_URL}/charity-esewa-${outcome}?sessionId=${sessionId}`;
+  return `${API_BASE_URL}/payments/charity/${sessionId}/esewa-callback?redirectUrl=${encodeURIComponent(appRedirectUrl)}&outcome=${encodeURIComponent(outcome)}`;
 };
 const getEarliestDuePayment = (payments) => [...payments]
   .filter((payment) => payment?.dueDate)
@@ -251,24 +256,119 @@ function TenantReportCard({ entry }) {
   );
 }
 
-function CharityContributionCard({ description = 'Support the community charity fund with a direct contribution.' }) {
+function CharityContributionCard({ description = 'Support the community charity fund with a direct contribution.', gatewayConfig }) {
+  const { refreshNotifications } = useNotifications();
   const [visible, setVisible] = useState(false);
   const [amount, setAmount] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [session, setSession] = useState(null);
+  const [localGatewayConfig, setLocalGatewayConfig] = useState(gatewayConfig || { esewaEnabled: true, khaltiEnabled: false });
+  const sessionRef = useRef(null);
+  sessionRef.current = session;
+
+  useEffect(() => {
+    setLocalGatewayConfig((current) => ({
+      ...current,
+      ...(gatewayConfig || {}),
+    }));
+  }, [gatewayConfig]);
+
+  useEffect(() => {
+    if (gatewayConfig) return undefined;
+
+    let mounted = true;
+    getGatewayConfig()
+      .then((response) => {
+        if (!mounted) return;
+        setLocalGatewayConfig({
+          esewaEnabled: Boolean(response.data?.esewaEnabled),
+          khaltiEnabled: Boolean(response.data?.khaltiEnabled),
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      mounted = false;
+    };
+  }, [gatewayConfig]);
+
+  const verifyCurrent = useCallback(async () => {
+    if (!sessionRef.current) return;
+
+    setSaving(true);
+    try {
+      const current = sessionRef.current;
+      const response = await verifyCharityDonation(current.sessionId, {
+        gateway: 'ESEWA',
+        transactionUuid: current.transactionUuid,
+        totalAmount: current.amount,
+      });
+
+      if (response.data?.verified) {
+        setAmount('');
+        setMessage('');
+        setSession(null);
+        setVisible(false);
+        await refreshNotifications({ silent: true });
+        Alert.alert('Donation Confirmed', 'Your charity donation was verified successfully.');
+      } else {
+        Alert.alert('Verification Pending', `Current gateway status: ${response.data?.status || 'Unknown'}`);
+      }
+    } catch (error) {
+      Alert.alert('Verification Failed', getApiErrorMessage(error, 'Unable to verify charity donation.'));
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  const handleIncomingUrl = useCallback((url) => {
+    if (!url || !url.startsWith(APP_PAYMENT_URL)) return;
+    if (url.includes('/charity-esewa-')) verifyCurrent();
+  }, [verifyCurrent]);
+
+  useEffect(() => {
+    Linking.getInitialURL().then((url) => {
+      if (url) handleIncomingUrl(url);
+    }).catch(() => {});
+    const sub = Linking.addEventListener('url', ({ url }) => handleIncomingUrl(url));
+    return () => sub.remove();
+  }, [handleIncomingUrl]);
 
   const donate = async () => {
     const value = parseFloat(amount);
     if (!value || value <= 0) return Alert.alert('Invalid Amount', 'Enter a valid donation amount.');
+    if (localGatewayConfig?.esewaEnabled === false) {
+      return Alert.alert('eSewa Unavailable', 'The eSewa gateway is not configured right now.');
+    }
+
     setSaving(true);
     try {
-      await donateToCharity({ amount: value, message });
-      setAmount('');
-      setMessage('');
-      setVisible(false);
-      Alert.alert('Donation Added', 'Charity donation was recorded.');
+      const response = await initiateCharityDonation({
+        gateway: 'ESEWA',
+        amount: value,
+        message,
+      });
+
+      const sessionId = response.data?.sessionId;
+      const transactionUuid = response.data?.transactionUuid;
+      if (!sessionId || !transactionUuid) {
+        throw new Error('Unable to prepare charity donation checkout.');
+      }
+
+      const successUrl = buildCharityEsewaCallbackUrl(sessionId, 'success');
+      const failureUrl = buildCharityEsewaCallbackUrl(sessionId, 'failure');
+
+      setSession({
+        sessionId,
+        transactionUuid,
+        amount: value,
+      });
+
+      const bridgeUrl = `${API_BASE_URL}/payments/charity/${sessionId}/esewa-redirect?transactionUuid=${encodeURIComponent(transactionUuid)}&successUrl=${encodeURIComponent(successUrl)}&failureUrl=${encodeURIComponent(failureUrl)}`;
+      await Linking.openURL(bridgeUrl);
     } catch (error) {
-      Alert.alert('Donation Failed', getApiErrorMessage(error, 'Unable to donate.'));
+      Alert.alert('Donation Failed', getApiErrorMessage(error, 'Unable to start charity donation.'));
     } finally {
       setSaving(false);
     }
@@ -292,9 +392,12 @@ function CharityContributionCard({ description = 'Support the community charity 
             <Text style={styles.charityHighlightValue}>Quick donation</Text>
           </View>
         </View>
+        <Text style={styles.gatewayHint}>
+          Donate through eSewa so the contribution is verified before it enters the charity ledger.
+        </Text>
         <TouchableOpacity style={styles.charityBtn} onPress={() => setVisible(true)}>
           <Ionicons name="heart" size={16} color="#FFF" />
-          <Text style={styles.charityBtnText}>Donate to Charity</Text>
+          <Text style={styles.charityBtnText}>Donate with eSewa</Text>
         </TouchableOpacity>
       </Card>
 
@@ -302,15 +405,24 @@ function CharityContributionCard({ description = 'Support the community charity 
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Make a Charity Donation</Text>
-            <Text style={styles.meta}>Your contribution will be recorded in the community charity fund ledger.</Text>
+            <Text style={styles.meta}>Your contribution will be verified through eSewa and then recorded in the community charity fund ledger.</Text>
             <TextInput style={styles.input} value={amount} onChangeText={setAmount} keyboardType="numeric" placeholder="Donation amount" placeholderTextColor={COLORS.textMuted} />
             <TextInput style={[styles.input, styles.textArea]} value={message} onChangeText={setMessage} placeholder="Message or note (optional)" placeholderTextColor={COLORS.textMuted} multiline />
+            {session ? (
+              <View style={styles.sessionBox}>
+                <Text style={styles.sessionTitle}>Donation checkout in progress</Text>
+                <Text style={styles.sessionMeta}>{`${formatNPR(session.amount)} | eSewa`}</Text>
+                <TouchableOpacity style={styles.secondaryBtn} onPress={verifyCurrent} disabled={saving}>
+                  <Text style={styles.secondaryBtnText}>Verify donation</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
             <View style={styles.modalActionRow}>
               <TouchableOpacity style={styles.secondaryModalBtn} onPress={() => setVisible(false)} disabled={saving}>
                 <Text style={styles.secondaryModalBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.primaryModalBtn} onPress={donate} disabled={saving}>
-                {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryBtnText}>Confirm Donation</Text>}
+                {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryBtnText}>Continue to eSewa</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -321,6 +433,7 @@ function CharityContributionCard({ description = 'Support the community charity 
 }
 
 function usePaymentGateway(onPaid) {
+  const { refreshNotifications } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [processingGateway, setProcessingGateway] = useState(null);
   const [session, setSession] = useState(null);
@@ -338,6 +451,7 @@ function usePaymentGateway(onPaid) {
         : { gateway: 'ESEWA', transactionUuid: current.transactionUuid, totalAmount: current.amount };
       const response = await verifyPayment(current.paymentId, payload);
       if (response.data?.verified) {
+        await refreshNotifications({ silent: true });
         Alert.alert('Payment Confirmed', 'Your payment was verified successfully.');
         setSession(null);
         onPaid?.();
@@ -350,7 +464,7 @@ function usePaymentGateway(onPaid) {
       setLoading(false);
       setProcessingGateway(null);
     }
-  }, [onPaid]);
+  }, [onPaid, refreshNotifications]);
 
   const handleIncomingUrl = useCallback((url) => {
     if (!url || !url.startsWith(APP_PAYMENT_URL)) return;
@@ -412,6 +526,7 @@ function SecurityPayments() {
 }
 
 function TenantPayments() {
+  const { refreshNotifications } = useNotifications();
   const [loadingPage, setLoadingPage] = useState(true);
   const [ownerLinked, setOwnerLinked] = useState(false);
   const [owners, setOwners] = useState([]);
@@ -494,7 +609,11 @@ function TenantPayments() {
           <Text style={styles.sectionTitle}>Link Your Owner</Text>
           <Text style={styles.meta}>Link your property owner only if you want rent bills to appear inside the app as well.</Text>
           {owners.map((owner) => (
-            <TouchableOpacity key={owner.id} style={styles.linkRow} onPress={async () => { await selectOwner(owner.id); load(); }}>
+            <TouchableOpacity key={owner.id} style={styles.linkRow} onPress={async () => {
+              await selectOwner(owner.id);
+              await refreshNotifications({ silent: true });
+              load();
+            }}>
               <Text style={styles.title}>{owner.name}</Text>
               <Text style={styles.meta}>{owner.email}</Text>
             </TouchableOpacity>
@@ -520,12 +639,13 @@ function TenantPayments() {
       ) : <Card><Text style={styles.meta}>Link an owner first to receive rent bills.</Text></Card>}
 
       <CheckoutCard selectedPayment={selectedPayment} gatewayConfig={gatewayConfig} loading={loading} processingGateway={processingGateway} session={session} onPay={(gateway) => startGateway(selectedPayment, gateway)} onVerify={verifyCurrent} />
-      <CharityContributionCard description="Want to contribute beyond your bills? Add a charity donation without leaving the payments workspace." />
+      <CharityContributionCard gatewayConfig={gatewayConfig} description="Want to contribute beyond your bills? Add a charity donation without leaving the payments workspace." />
     </ScrollView>
   );
 }
 
 function OwnerPayments() {
+  const { refreshNotifications } = useNotifications();
   const [loadingPage, setLoadingPage] = useState(true);
   const [payments, setPayments] = useState([]);
   const [tenants, setTenants] = useState([]);
@@ -657,6 +777,7 @@ function OwnerPayments() {
                 setBillTenant(null);
                 setBillTitle('');
                 setBillAmount('');
+                await refreshNotifications({ silent: true });
                 load();
               } catch (error) {
                 Alert.alert('Bill Failed', getApiErrorMessage(error, 'Unable to create rent bill.'));
@@ -667,7 +788,7 @@ function OwnerPayments() {
           </View>
         </View>
       </Modal>
-      <CharityContributionCard description="You can also contribute to the community charity fund from the same payment area." />
+      <CharityContributionCard gatewayConfig={gatewayConfig} description="You can also contribute to the community charity fund from the same payment area." />
     </ScrollView>
   );
 }

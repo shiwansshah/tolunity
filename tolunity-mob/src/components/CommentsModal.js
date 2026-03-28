@@ -14,9 +14,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getPostComments, createComment } from '../api/feedApi';
+import { useNotifications } from '../context/NotificationContext';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 
 export default function CommentsModal({ visible, postId, onClose, onCommentAdded }) {
+  const { refreshNotifications } = useNotifications();
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [newComment, setNewComment] = useState('');
@@ -48,6 +50,7 @@ export default function CommentsModal({ visible, postId, onClose, onCommentAdded
       await createComment(postId, newComment.trim());
       setNewComment('');
       await loadComments();
+      await refreshNotifications({ silent: true });
       if (onCommentAdded) onCommentAdded();
     } catch (error) {
       console.error('Create comment error:', error);

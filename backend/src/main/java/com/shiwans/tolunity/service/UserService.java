@@ -4,6 +4,7 @@ import com.shiwans.tolunity.Repo.UserRepository;
 import com.shiwans.tolunity.Util.SecurityUtil;
 import com.shiwans.tolunity.dto.UserDTOs.ChangePasswordRequest;
 import com.shiwans.tolunity.entities.User;
+import com.shiwans.tolunity.enums.UserRolesEnum;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,6 +20,29 @@ public class UserService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    public ResponseEntity<?> getCurrentUserProfile() {
+        try {
+            Long currentUserId = SecurityUtil.getCurrentUserId();
+            User user = userRepository.findUserById(currentUserId);
+
+            if (user == null) {
+                return ResponseEntity.status(404).body(Map.of("error", "User not found"));
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "id", user.getId(),
+                    "name", user.getName(),
+                    "email", user.getEmail(),
+                    "phoneNumber", user.getPhoneNumber(),
+                    "profilePic", user.getProfilePic() != null ? user.getProfilePic() : "",
+                    "userRole", normalizeRole(user.getRole()),
+                    "userType", user.getUserType() != null ? user.getUserType().toString() : null
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to load profile: " + e.getMessage()));
+        }
+    }
 
     public ResponseEntity<?> updateProfilePic(String profilePicUrl) {
         try {
@@ -87,5 +111,16 @@ public class UserService {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", "Failed to change password: " + e.getMessage()));
         }
+    }
+
+    private String normalizeRole(UserRolesEnum role) {
+        if (role == null) {
+            return null;
+        }
+
+        return switch (role) {
+            case ROLE_ADMIN -> "ADMIN";
+            case ROLE_USER -> "USER";
+        };
     }
 }

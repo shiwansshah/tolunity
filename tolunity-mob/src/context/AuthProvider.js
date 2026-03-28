@@ -9,6 +9,7 @@ import {
   storeUser,
   clearStorage,
 } from '../utils/storage';
+import { getMyProfile } from '../api/userApi';
 import { globalEvent } from '../utils/EventEmitter';
 import { useRouter } from 'expo-router';
 
@@ -26,8 +27,18 @@ export default function AuthProvider({ children }) {
         const storedUser = await getUser();
         const rememberSession = await getRememberMe();
         if (storedToken && storedUser && rememberSession) {
+          let restoredUser = storedUser;
+          if (!storedUser.id) {
+            try {
+              const profileResponse = await getMyProfile();
+              restoredUser = { ...storedUser, ...(profileResponse.data || {}) };
+              await storeUser(restoredUser);
+            } catch (error) {
+              console.error('Error hydrating user profile:', error);
+            }
+          }
           setToken(storedToken);
-          setUser(storedUser);
+          setUser(restoredUser);
         } else if (storedToken || storedUser) {
           await clearStorage();
         }

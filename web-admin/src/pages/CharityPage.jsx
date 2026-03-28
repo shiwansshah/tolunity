@@ -249,9 +249,9 @@ const CharityPage = () => {
                 <tr key={donation.id}>
                   <td>
                     <div className="font-bold">{donation.donorName}</div>
-                    {donation.recordedById && (
+                    {(donation.entrySource || 'APP').toUpperCase() === 'MANUAL' && donation.recordedByName && (
                       <div className="text-sm text-muted mt-1">
-                        Recorded by ID: {donation.recordedById}
+                        Recorded by {donation.recordedByName}
                       </div>
                     )}
                   </td>

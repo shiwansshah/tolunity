@@ -19,6 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { MediaTypeOptions } from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNotifications } from '../context/NotificationContext';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import { createComplaint, getComplaints, toggleComplaintUpvote } from '../api/complaintApi';
 import { getApiErrorMessage } from '../api/apiError';
@@ -40,6 +41,7 @@ const formatStatus = (status) =>
     .join(' ');
 
 export default function ComplaintsScreen() {
+  const { refreshNotifications } = useNotifications();
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -114,6 +116,7 @@ export default function ComplaintsScreen() {
       setCategory(CATEGORIES[0]);
       setMediaAssets([]);
       setModalVisible(false);
+      await refreshNotifications({ silent: true });
       loadComplaints();
       Alert.alert('Complaint Submitted', 'Your complaint is now visible to the community and admin.');
     } catch (error) {
@@ -126,6 +129,7 @@ export default function ComplaintsScreen() {
   const upvote = async (complaintId) => {
     try {
       await toggleComplaintUpvote(complaintId);
+      await refreshNotifications({ silent: true });
       loadComplaints();
     } catch (error) {
       Alert.alert('Upvote Failed', getApiErrorMessage(error, 'Unable to update upvote.'));

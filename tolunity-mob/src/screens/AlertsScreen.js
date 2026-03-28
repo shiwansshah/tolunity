@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -6,59 +6,66 @@ import {
   FlatList,
   TouchableOpacity,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { useNotifications } from '../context/NotificationContext';
 
-const MOCK_ALERTS = [
-  {
-    id: '1', type: 'Emergency',
-    title: 'Water Supply Disruption',
-    message: 'Water supply will be disrupted from 6 AM to 2 PM on March 16.',
-    time: '2 hours ago', read: false, icon: 'water', color: COLORS.error,
-  },
-  {
-    id: '2', type: 'Notice',
-    title: 'Community Meeting',
-    message: 'Monthly community meeting scheduled for Saturday at 5 PM at the community hall.',
-    time: '5 hours ago', read: false, icon: 'people', color: COLORS.primary,
-  },
-  {
-    id: '3', type: 'Reminder',
-    title: 'Maintenance Due',
-    message: 'Monthly maintenance fee due by March 31. Please pay on time to avoid penalties.',
-    time: 'Yesterday', read: true, icon: 'calendar', color: COLORS.warning,
-  },
-  {
-    id: '4', type: 'Info',
-    title: 'New Community Rules',
-    message: 'New noise restrictions are in place after 10 PM. Please cooperate.',
-    time: '2 days ago', read: true, icon: 'information-circle', color: COLORS.info,
-  },
-];
+const TYPE_META = {
+  LIKE: { label: 'Like', icon: 'heart', color: COLORS.likePink },
+  COMMENT: { label: 'Comment', icon: 'chatbubble', color: COLORS.primary },
+  PAYMENT: { label: 'Payment', icon: 'card', color: COLORS.success },
+  RENT: { label: 'Rent', icon: 'home', color: COLORS.info },
+  ALERT: { label: 'Alert', icon: 'alert-circle', color: COLORS.error },
+  DONATION: { label: 'Donation', icon: 'heart-circle', color: '#C2416C' },
+  COMPLAINT: { label: 'Complaint', icon: 'flag', color: COLORS.warning },
+  FEE: { label: 'Fee', icon: 'receipt', color: COLORS.primary },
+};
+
+const formatRelativeTime = (value) => {
+  if (!value) return '';
+
+  const date = new Date(value);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMinutes < 60) return `${diffMinutes} min ago`;
+  if (diffHours < 24) return `${diffHours} hr${diffHours > 1 ? 's' : ''} ago`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+
+  return date.toLocaleDateString();
+};
 
 export default function AlertsScreen() {
-  const [alerts, setAlerts] = useState(MOCK_ALERTS);
-  const unreadCount = alerts.filter((a) => !a.read).length;
-
-  const markAllRead = () => setAlerts((prev) => prev.map((a) => ({ ...a, read: true })));
-  const markRead = (id) => setAlerts((prev) => prev.map((a) => a.id === id ? { ...a, read: true } : a));
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    refreshNotifications,
+    markAsRead,
+    markAllAsRead,
+  } = useNotifications();
 
   const renderAlert = ({ item }) => (
     <TouchableOpacity
-      style={[styles.card, !item.read && styles.cardUnread]}
-      onPress={() => markRead(item.id)}
+      style={[styles.card, !item.isRead && styles.cardUnread]}
+      onPress={() => markAsRead(item.id)}
       activeOpacity={0.85}
     >
-      {!item.read && <View style={styles.unreadDot} />}
-      <View style={[styles.iconWrap, { backgroundColor: item.color + '20' }]}>
-        <Ionicons name={item.icon} size={22} color={item.color} />
+      {!item.isRead && <View style={styles.unreadDot} />}
+      <View style={[styles.iconWrap, { backgroundColor: `${(TYPE_META[item.type]?.color || COLORS.primary)}20` }]}>
+        <Ionicons name={TYPE_META[item.type]?.icon || 'notifications'} size={22} color={TYPE_META[item.type]?.color || COLORS.primary} />
       </View>
       <View style={styles.info}>
         <View style={styles.topRow}>
-          <Text style={styles.typeTag}>{item.type}</Text>
-          <Text style={styles.time}>{item.time}</Text>
+          <Text style={styles.typeTag}>{TYPE_META[item.type]?.label || item.type || 'Alert'}</Text>
+          <Text style={styles.time}>{formatRelativeTime(item.createdAt)}</Text>
         </View>
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.message} numberOfLines={2}>{item.message}</Text>
@@ -77,18 +84,25 @@ export default function AlertsScreen() {
             )}
           </View>
           {unreadCount > 0 && (
-            <TouchableOpacity onPress={markAllRead} style={styles.markAllBtn}>
+            <TouchableOpacity onPress={markAllAsRead} style={styles.markAllBtn}>
               <Text style={styles.markAllText}>Mark all read</Text>
             </TouchableOpacity>
           )}
         </View>
 
+        {loading && notifications.length === 0 ? (
+          <View style={styles.loader}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+        ) : (
         <FlatList
-          data={alerts}
-          keyExtractor={(item) => item.id}
+          data={notifications}
+          keyExtractor={(item) => String(item.id)}
           renderItem={renderAlert}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshing={loading}
+          onRefresh={() => refreshNotifications()}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="notifications-off-outline" size={48} color={COLORS.textMuted} />
@@ -96,6 +110,7 @@ export default function AlertsScreen() {
             </View>
           }
         />
+        )}
       </SafeAreaView>
   );
 }
@@ -116,6 +131,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
   },
   markAllText: { color: '#FFF', fontSize: FONTS.sizes.xs, fontWeight: '600' },
+  loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: SPACING.lg, paddingBottom: SPACING.xxxl },
   card: {
     flexDirection: 'row', alignItems: 'flex-start',

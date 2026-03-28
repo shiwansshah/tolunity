@@ -7,3 +7,5 @@ export const initiatePayment = (paymentId, data) => axiosInstance.post(`/payment
 export const verifyPayment = (paymentId, data) => axiosInstance.post(`/payments/pay/${paymentId}/verify`, data);
 export const createBill = (data) => axiosInstance.post('/payments/create-bill', data);
 export const donateToCharity = (data) => axiosInstance.post('/payments/donate', data);
+export const initiateCharityDonation = (data) => axiosInstance.post('/payments/charity/initiate', data);
+export const verifyCharityDonation = (sessionId, data) => axiosInstance.post(`/payments/charity/${sessionId}/verify`, data);

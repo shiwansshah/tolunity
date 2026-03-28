@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import { toggleLike, deletePost } from '../api/feedApi';
+import { useNotifications } from '../context/NotificationContext';
 import CommentsModal from './CommentsModal';
 
 /**
@@ -21,6 +22,7 @@ import CommentsModal from './CommentsModal';
  */
 export default function PostCard({ post, reload, currentUser }) {
   const router = useRouter();
+  const { refreshNotifications } = useNotifications();
   const [likeLoading, setLikeLoading] = React.useState(false);
   const [isLiked, setIsLiked] = React.useState(post.likedByCurrentUser);
   const [likesCount, setLikesCount] = React.useState(post.likesCount ?? 0);
@@ -44,6 +46,7 @@ export default function PostCard({ post, reload, currentUser }) {
         setLikesCount(res.data.likesCount);
         setIsLiked(res.data.liked);
       }
+      await refreshNotifications({ silent: true });
     } catch (error) {
       // Revert on error
       setIsLiked(wasLiked);

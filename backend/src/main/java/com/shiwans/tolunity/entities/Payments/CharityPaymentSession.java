@@ -3,17 +3,19 @@ package com.shiwans.tolunity.entities.Payments;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 
 @Entity
-@Table(name = "charity_donations")
+@Table(name = "charity_payment_sessions")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CharityDonation {
+public class CharityPaymentSession {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,11 +27,10 @@ public class CharityDonation {
     @Column(name = "donor_name")
     private String donorName;
 
-    @Column(name = "entry_source")
-    private String entrySource;
+    @Column(nullable = false)
+    private Double amount;
 
-    @Column(name = "recorded_by_id")
-    private Long recordedById;
+    private String message;
 
     @Column(name = "gateway_provider")
     private String gatewayProvider;
@@ -43,17 +44,12 @@ public class CharityDonation {
     @Column(name = "gateway_status")
     private String gatewayStatus;
 
-    @Column(name = "paid_date")
-    private Date paidDate;
-
-    @Column(nullable = false)
-    private Double amount;
-
-    private String message;
-
     @Column(name = "del_flg")
     private boolean delFlg = false;
 
     @CreationTimestamp
     private Date createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
 }

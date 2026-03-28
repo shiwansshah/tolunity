@@ -12,6 +12,7 @@ import com.shiwans.tolunity.entities.Payments.Payment;
 import com.shiwans.tolunity.entities.User;
 import com.shiwans.tolunity.enums.UserRolesEnum;
 import com.shiwans.tolunity.enums.UserTypeEnum;
+import com.shiwans.tolunity.service.NotificationService;
 import com.shiwans.tolunity.service.PaymentDtoMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -44,6 +45,7 @@ public class AdminService {
     private final CharityDonationRepository charityDonationRepository;
     private final PaymentDtoMapper paymentDtoMapper;
     private final AdminAuditService adminAuditService;
+    private final NotificationService notificationService;
 
     public ResponseEntity<?> getDashboardStats() {
         List<User> allUsers = userRepository.findAllByDelFlgFalse();
@@ -158,6 +160,7 @@ public class AdminService {
                 "Saved " + feeType + " fee configuration",
                 "amount=" + amount + ", intervalDays=" + intervalDays + ", description=" + (description != null ? description : "")
         );
+        notificationService.notifyFeeConfigured(feeType);
         return ResponseEntity.ok(Map.of("message", "Fee configuration saved successfully", "config", config));
     }
 
@@ -275,11 +278,19 @@ public class AdminService {
     public ResponseEntity<?> getCharityData() {
         List<CharityDonation> donations = charityDonationRepository.findByDelFlgFalseOrderByCreatedAtDesc();
         double total = donations.stream().mapToDouble(CharityDonation::getAmount).sum();
+        Set<Long> recorderIds = donations.stream()
+                .map(CharityDonation::getRecordedById)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, String> recorderNames = userRepository.findAllById(recorderIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getName));
 
         Map<String, Object> result = new HashMap<>();
         result.put("totalFund", total);
         result.put("totalDonations", donations.size());
-        result.put("donations", donations);
+        result.put("donations", donations.stream()
+                .map(donation -> mapCharityDonation(donation, recorderNames.get(donation.getRecordedById())))
+                .toList());
 
         return ResponseEntity.ok(result);
     }
@@ -318,6 +329,7 @@ public class AdminService {
                 "Added manual charity entry for " + donorName,
                 "amount=" + amount + ", recordedBy=" + currentUser.getEmail()
         );
+        notificationService.notifyGlobalDonation("charity-manual:" + donation.getId());
 
         return ResponseEntity.ok(Map.of(
                 "message", "Manual charity entry recorded successfully",
@@ -330,6 +342,20 @@ public class AdminService {
                 .filter(payment -> category.equalsIgnoreCase(payment.getCategory()) && "Paid".equalsIgnoreCase(payment.getStatus()))
                 .mapToDouble(Payment::getAmount)
                 .sum();
+    }
+
+    private Map<String, Object> mapCharityDonation(CharityDonation donation, String recordedByName) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", donation.getId());
+        map.put("donorId", donation.getDonorId());
+        map.put("donorName", donation.getDonorName());
+        map.put("entrySource", donation.getEntrySource());
+        map.put("recordedById", donation.getRecordedById());
+        map.put("recordedByName", recordedByName);
+        map.put("amount", donation.getAmount());
+        map.put("message", donation.getMessage());
+        map.put("createdAt", donation.getCreatedAt());
+        return map;
     }
 
     private Map<String, Object> mapUser(User user) {

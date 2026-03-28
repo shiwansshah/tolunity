@@ -16,6 +16,7 @@ import com.shiwans.tolunity.entities.Complaints.ComplaintUpvote;
 import com.shiwans.tolunity.entities.User;
 import com.shiwans.tolunity.enums.MediaTypeEnum;
 import com.shiwans.tolunity.service.AdminServices.AdminAuditService;
+import com.shiwans.tolunity.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +37,7 @@ public class ComplaintService {
     private final ComplaintUpvoteRepository complaintUpvoteRepository;
     private final UserRepository userRepository;
     private final AdminAuditService adminAuditService;
+    private final NotificationService notificationService;
 
     @Value("${app.complaints.followup.name}")
     private String followUpName;
@@ -145,6 +147,7 @@ public class ComplaintService {
                 "Updated complaint #" + complaint.getId() + " to " + normalizedStatus,
                 "resolutionNote=" + (complaint.getResolutionNote() != null ? complaint.getResolutionNote() : "")
         );
+        notificationService.notifyComplaintUpdated(complaint.getCreatedById(), complaint.getId());
 
         return ResponseEntity.ok(Map.of("message", "Complaint updated successfully"));
     }
