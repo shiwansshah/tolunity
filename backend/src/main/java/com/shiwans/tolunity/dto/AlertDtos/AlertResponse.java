@@ -1,5 +1,6 @@
 package com.shiwans.tolunity.dto.AlertDtos;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.util.Date;
@@ -12,6 +13,7 @@ public class AlertResponse {
     private String description;
     private Long createdById;
     private String createdByName;
+    @JsonProperty("isRead")
     private boolean isRead;
     private Date createdAt;
     private List<MediaItem> mediaList;

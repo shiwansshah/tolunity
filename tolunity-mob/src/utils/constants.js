@@ -6,9 +6,12 @@ export const ENDPOINTS = {
   LOGIN: '/auth/login',
   REGISTER: '/auth/register',
   LOGOUT: '/auth/logout',
+  REQUEST_PASSWORD_RESET: '/auth/forgot-password/request',
+  RESET_PASSWORD_WITH_CODE: '/auth/forgot-password/reset',
   UPDATE_PROFILE_PIC: '/user/profile/picture',
   UPDATE_PROFILE: '/user/profile/update',
   CHANGE_PASSWORD: '/user/password/change',
+  MOBILE_ABOUT: '/mobile-content/about',
   GET_FEED: '/feed/getFeed',
   CREATE_POST: '/feed/createPost',
   EDIT_POST: (postId) => `/feed/editPost/${postId}`,
@@ -26,3 +29,4 @@ export const STORAGE_KEYS = {
 };
 
 export const FEED_PAGE_SIZE = appConfig.feedPageSize;
+export const EXPO_PROJECT_ID = appConfig.expoProjectId;

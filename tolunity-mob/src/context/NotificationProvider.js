@@ -70,11 +70,18 @@ export default function NotificationProvider({ children }) {
       return;
     }
 
+    setNotifications((current) => current.map((notification) => (
+      notification.id === notificationId
+        ? { ...notification, isRead: true }
+        : notification
+    )));
+
     try {
       await markNotificationAsRead(user.id, notificationId);
       await refreshNotifications({ silent: true });
     } catch (error) {
       console.error('Failed to mark notification as read', error);
+      await refreshNotifications({ silent: true });
     }
   }, [refreshNotifications, user?.id]);
 
@@ -83,11 +90,14 @@ export default function NotificationProvider({ children }) {
       return;
     }
 
+    setNotifications((current) => current.map((notification) => ({ ...notification, isRead: true })));
+
     try {
       await markAllNotificationsAsRead(user.id);
       await refreshNotifications({ silent: true });
     } catch (error) {
       console.error('Failed to mark all notifications as read', error);
+      await refreshNotifications({ silent: true });
     }
   }, [refreshNotifications, user?.id]);
 

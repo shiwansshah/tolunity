@@ -1,6 +1,7 @@
 package com.shiwans.tolunity.controller.AdminController;
 
 import com.shiwans.tolunity.dto.ComplaintDtos.UpdateComplaintStatusRequest;
+import com.shiwans.tolunity.service.MobileAboutContentService;
 import com.shiwans.tolunity.service.AdminServices.AdminAuditService;
 import com.shiwans.tolunity.service.ComplaintService;
 import com.shiwans.tolunity.service.AdminServices.AdminService;
@@ -21,6 +22,7 @@ public class AdminController {
     private final AdminAuditService adminAuditService;
     private final ComplaintService complaintService;
     private final VisitorService visitorService;
+    private final MobileAboutContentService mobileAboutContentService;
 
     @GetMapping("/dashboard")
     public ResponseEntity<?> getDashboardStats() {
@@ -99,5 +101,15 @@ public class AdminController {
             @RequestBody UpdateComplaintStatusRequest request
     ) {
         return complaintService.updateComplaintStatus(complaintId, request);
+    }
+
+    @GetMapping("/mobile-about")
+    public ResponseEntity<?> getMobileAboutContent() {
+        return ResponseEntity.ok(mobileAboutContentService.getAdminContent());
+    }
+
+    @PutMapping("/mobile-about")
+    public ResponseEntity<?> saveMobileAboutContent(@RequestBody Map<String, Object> request) {
+        return ResponseEntity.ok(mobileAboutContentService.saveContent(request));
     }
 }

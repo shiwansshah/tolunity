@@ -116,7 +116,7 @@ export default function AlertsScreen() {
 
   const renderAlert = ({ item }) => (
     <TouchableOpacity
-      style={[styles.card, !item.isRead && styles.cardUnread]}
+      style={[styles.card, item.isRead ? styles.cardRead : styles.cardUnread]}
       onPress={() => markAsRead(item.id)}
       activeOpacity={0.85}
     >
@@ -126,11 +126,11 @@ export default function AlertsScreen() {
       </View>
       <View style={styles.info}>
         <View style={styles.topRow}>
-          <Text style={styles.typeTag}>Emergency Alert</Text>
+          <Text style={[styles.typeTag, item.isRead && styles.typeTagRead]}>Emergency Alert</Text>
           <Text style={styles.time}>{formatRelativeTime(item.createdAt)}</Text>
         </View>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.message}>{item.description}</Text>
+        <Text style={[styles.title, item.isRead && styles.titleRead]}>{item.title}</Text>
+        <Text style={[styles.message, item.isRead && styles.messageRead]}>{item.description}</Text>
         <Text style={styles.creator}>Raised by {item.createdByName}</Text>
         {item.mediaList?.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaStrip}>
@@ -302,6 +302,11 @@ const styles = StyleSheet.create({
     ...SHADOWS.card,
     position: 'relative',
   },
+  cardRead: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
   cardUnread: { borderLeftWidth: 3, borderLeftColor: ALERT_COLOR },
   unreadDot: {
     position: 'absolute',
@@ -323,9 +328,12 @@ const styles = StyleSheet.create({
   info: { flex: 1 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   typeTag: { fontSize: FONTS.sizes.xs, fontWeight: '700', color: ALERT_COLOR },
+  typeTagRead: { color: COLORS.textMuted },
   time: { fontSize: FONTS.sizes.xs, color: COLORS.textMuted },
   title: { fontSize: FONTS.sizes.md, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 4 },
+  titleRead: { color: COLORS.textSecondary },
   message: { fontSize: FONTS.sizes.sm, color: COLORS.textSecondary, lineHeight: 20 },
+  messageRead: { color: COLORS.textMuted },
   creator: { marginTop: 6, fontSize: FONTS.sizes.xs, color: COLORS.textMuted, fontWeight: '600' },
   mediaStrip: { marginTop: SPACING.md, marginBottom: SPACING.sm },
   mediaCard: {

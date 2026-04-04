@@ -54,7 +54,7 @@ export default function NotificationsScreen() {
 
   const renderNotification = ({ item }) => (
     <TouchableOpacity
-      style={[styles.card, !item.isRead && styles.cardUnread]}
+      style={[styles.card, item.isRead ? styles.cardRead : styles.cardUnread]}
       onPress={() => markAsRead(item.id)}
       activeOpacity={0.85}
     >
@@ -64,11 +64,11 @@ export default function NotificationsScreen() {
       </View>
       <View style={styles.info}>
         <View style={styles.topRow}>
-          <Text style={styles.typeTag}>{TYPE_META[item.type]?.label || item.type || 'Notification'}</Text>
+          <Text style={[styles.typeTag, item.isRead && styles.typeTagRead]}>{TYPE_META[item.type]?.label || item.type || 'Notification'}</Text>
           <Text style={styles.time}>{formatRelativeTime(item.createdAt)}</Text>
         </View>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.message} numberOfLines={3}>{item.message}</Text>
+        <Text style={[styles.title, item.isRead && styles.titleRead]}>{item.title}</Text>
+        <Text style={[styles.message, item.isRead && styles.messageRead]} numberOfLines={3}>{item.message}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -149,6 +149,11 @@ const styles = StyleSheet.create({
     ...SHADOWS.card,
     position: 'relative',
   },
+  cardRead: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
   cardUnread: { borderLeftWidth: 3, borderLeftColor: COLORS.primary },
   unreadDot: {
     position: 'absolute',
@@ -170,9 +175,12 @@ const styles = StyleSheet.create({
   info: { flex: 1 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   typeTag: { fontSize: FONTS.sizes.xs, fontWeight: '700', color: COLORS.primary },
+  typeTagRead: { color: COLORS.textMuted },
   time: { fontSize: FONTS.sizes.xs, color: COLORS.textMuted },
   title: { fontSize: FONTS.sizes.md, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 4 },
+  titleRead: { color: COLORS.textSecondary },
   message: { fontSize: FONTS.sizes.sm, color: COLORS.textSecondary, lineHeight: 20 },
+  messageRead: { color: COLORS.textMuted },
   empty: { alignItems: 'center', paddingVertical: SPACING.xxxl * 2 },
   emptyText: { marginTop: SPACING.md, fontSize: FONTS.sizes.md, color: COLORS.textSecondary },
 });

@@ -70,20 +70,30 @@ export default function AlertProvider({ children }) {
       return;
     }
 
+    setAlerts((current) => current.map((alert) => (
+      alert.id === alertId
+        ? { ...alert, isRead: true }
+        : alert
+    )));
+
     try {
       await markAlertAsRead(alertId);
       await refreshAlerts({ silent: true });
     } catch (error) {
       console.error('Failed to mark alert as read', error);
+      await refreshAlerts({ silent: true });
     }
   }, [refreshAlerts]);
 
   const markAllAsRead = useCallback(async () => {
+    setAlerts((current) => current.map((alert) => ({ ...alert, isRead: true })));
+
     try {
       await markAllAlertsAsRead();
       await refreshAlerts({ silent: true });
     } catch (error) {
       console.error('Failed to mark all alerts as read', error);
+      await refreshAlerts({ silent: true });
     }
   }, [refreshAlerts]);
 

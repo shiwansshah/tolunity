@@ -15,6 +15,7 @@ import ComplaintsPage from './pages/ComplaintsPage';
 import AlertsPage from './pages/AlertsPage';
 import ActivityLogPage from './pages/ActivityLogPage';
 import VisitorsLogPage from './pages/VisitorsLogPage';
+import AboutTolUnityPage from './pages/AboutTolUnityPage';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -44,6 +45,7 @@ function App() {
             <Route path="complaints" element={<ComplaintsPage />} />
             <Route path="charity" element={<CharityPage />} />
             <Route path="activity-log" element={<ActivityLogPage />} />
+            <Route path="about-tolunity" element={<AboutTolUnityPage />} />
           </Route>
           
           <Route path="*" element={<Navigate to="/" replace />} />

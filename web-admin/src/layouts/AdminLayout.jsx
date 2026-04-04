@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, CreditCard, LogOut, Shield, Settings, Heart, Flag, ScrollText, QrCode, TriangleAlert } from 'lucide-react';
+import { LayoutDashboard, Users, CreditCard, LogOut, Shield, Settings, Heart, Flag, ScrollText, QrCode, TriangleAlert, Info } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import './AdminLayout.css';
 
@@ -23,6 +23,7 @@ const AdminLayout = () => {
     { path: '/complaints', icon: Flag, label: 'Complaints' },
     { path: '/charity', icon: Heart, label: 'Charity Fund' },
     { path: '/activity-log', icon: ScrollText, label: 'Activity Log' },
+    { path: '/about-tolunity', icon: Info, label: 'Mobile About' },
   ];
 
   return (

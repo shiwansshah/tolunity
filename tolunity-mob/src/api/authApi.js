@@ -28,6 +28,22 @@ export const logoutUser = () =>
   axiosInstance.post(ENDPOINTS.LOGOUT);
 
 /**
+ * Request forgot-password verification code
+ * POST /api/auth/forgot-password/request
+ * Body: { email }
+ */
+export const requestPasswordReset = (data) =>
+  axiosInstance.post(ENDPOINTS.REQUEST_PASSWORD_RESET, data);
+
+/**
+ * Reset password using email verification code
+ * POST /api/auth/forgot-password/reset
+ * Body: { email, code, newPassword }
+ */
+export const resetPasswordWithCode = (data) =>
+  axiosInstance.post(ENDPOINTS.RESET_PASSWORD_WITH_CODE, data);
+
+/**
  * Update user profile picture
  * POST /api/user/profile/picture
  * Body: { profilePic: base64 | url | null }

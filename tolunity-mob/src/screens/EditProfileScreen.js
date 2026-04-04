@@ -26,17 +26,41 @@ export default function EditProfileScreen() {
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phoneNumber || '');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const validatePhone = (value) => /^(98|97)\d{8}$/.test(value);
+
+  const handlePhoneChange = (value) => {
+    const digitsOnly = value.replace(/\D/g, '').slice(0, 10);
+    setPhone(digitsOnly);
+    if (errors.phone) {
+      setErrors((current) => ({ ...current, phone: null }));
+    }
+  };
 
   const handleSave = async () => {
-    if (!name.trim()) {
-      Alert.alert('Error', 'Name cannot be empty');
+    const trimmedName = name.trim();
+    const trimmedPhone = phone.trim();
+
+    const nextErrors = {};
+    if (!trimmedName) {
+      nextErrors.name = 'Name cannot be empty';
+    }
+    if (!trimmedPhone) {
+      nextErrors.phone = 'Phone number is required';
+    } else if (!validatePhone(trimmedPhone)) {
+      nextErrors.phone = 'Phone number must be 10 digits and start with 98 or 97';
+    }
+
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
       return;
     }
 
     setLoading(true);
     try {
-      await updateProfile({ name: name.trim(), phoneNumber: phone.trim() });
-      await updateUser({ name: name.trim(), phoneNumber: phone.trim() });
+      await updateProfile({ name: trimmedName, phoneNumber: trimmedPhone });
+      await updateUser({ name: trimmedName, phoneNumber: trimmedPhone });
       Alert.alert('Success', 'Profile updated successfully', [
         { text: 'OK', onPress: () => router.back() }
       ]);
@@ -69,22 +93,29 @@ export default function EditProfileScreen() {
               label="Full Name"
               placeholder="Enter your name"
               value={name}
-              onChangeText={setName}
+              onChangeText={(value) => {
+                setName(value);
+                if (errors.name) {
+                  setErrors((current) => ({ ...current, name: null }));
+                }
+              }}
               iconName="person-outline"
+              error={errors.name}
             />
 
             <InputField
               label="Phone Number"
-              placeholder="Enter your phone number"
+              placeholder="98XXXXXXXX"
               value={phone}
-              onChangeText={setPhone}
+              onChangeText={handlePhoneChange}
               iconName="call-outline"
               keyboardType="phone-pad"
+              error={errors.phone}
             />
 
             <View style={styles.infoBox}>
               <Ionicons name="information-circle-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.infoText}>Email cannot be changed as it is linked to your identity.</Text>
+              <Text style={styles.infoText}>Use a 10-digit number that starts with 98 or 97. Email cannot be changed as it is linked to your identity.</Text>
             </View>
           </View>
 

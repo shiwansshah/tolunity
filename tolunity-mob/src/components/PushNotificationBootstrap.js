@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useAlerts } from '../context/AlertContext';
 import { registerPushToken } from '../api/userApi';
+import { EXPO_PROJECT_ID } from '../utils/constants';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -44,7 +45,11 @@ async function registerForPushNotificationsAsync() {
     return null;
   }
 
-  const projectId = Constants.easConfig?.projectId ?? Constants.expoConfig?.extra?.eas?.projectId;
+  const configuredProjectId = EXPO_PROJECT_ID?.trim();
+  const projectId =
+    Constants.easConfig?.projectId
+    ?? Constants.expoConfig?.extra?.eas?.projectId
+    ?? (configuredProjectId ? configuredProjectId : undefined);
   const tokenResponse = projectId
     ? await Notifications.getExpoPushTokenAsync({ projectId })
     : await Notifications.getExpoPushTokenAsync();
@@ -82,7 +87,7 @@ export default function PushNotificationBootstrap() {
         await registerPushToken(expoPushToken);
         registeredKeyRef.current = registrationKey;
       } catch (error) {
-        console.error('Failed to register push notifications', error);
+        console.error('Failed to register push notifications', error?.message || error);
       }
     };
 

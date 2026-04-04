@@ -102,6 +102,8 @@ public class ExpoPushNotificationService {
         message.put("title", title);
         message.put("body", body);
         message.put("sound", "default");
+        message.put("channelId", "default");
+        message.put("priority", "high");
         if (data != null && !data.isEmpty()) {
             message.put("data", data);
         }

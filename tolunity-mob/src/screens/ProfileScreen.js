@@ -121,10 +121,11 @@ export default function ProfileScreen() {
       label: 'Change Password',
       action: () => router.push('/change-password')
     },
-    { icon: 'notifications-outline', label: 'Notifications', action: null },
-    { icon: 'lock-closed-outline', label: 'Privacy & Security', action: null },
-    { icon: 'help-circle-outline', label: 'Help & Support', action: null },
-    { icon: 'information-circle-outline', label: 'About TolUnity', action: null },
+    {
+      icon: 'information-circle-outline',
+      label: 'About TolUnity',
+      action: () => router.push('/about-tolunity')
+    },
   ];
 
   return (

@@ -17,5 +17,6 @@ export const appConfig = {
     process.env.EXPO_PUBLIC_API_BASE_URL ||
       platformFallback
   ),
+  expoProjectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || '',
   feedPageSize: 10,
 };

@@ -2,6 +2,7 @@ package com.shiwans.tolunity.service;
 
 import com.shiwans.tolunity.Repo.UserRepository;
 import com.shiwans.tolunity.Util.SecurityUtil;
+import com.shiwans.tolunity.Util.PhoneNumberUtil;
 import com.shiwans.tolunity.dto.UserDTOs.ChangePasswordRequest;
 import com.shiwans.tolunity.dto.UserDTOs.PushTokenRequest;
 import com.shiwans.tolunity.entities.User;
@@ -76,8 +77,20 @@ public class UserService {
                 return ResponseEntity.status(404).body(Map.of("error", "User not found"));
             }
 
-            if (name != null) user.setName(name);
-            if (phoneNumber != null) user.setPhoneNumber(phoneNumber);
+            if (name != null) {
+                String normalizedName = name.trim();
+                if (normalizedName.isEmpty()) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Name cannot be empty"));
+                }
+                user.setName(normalizedName);
+            }
+            if (phoneNumber != null) {
+                String normalizedPhoneNumber = PhoneNumberUtil.normalize(phoneNumber);
+                if (!PhoneNumberUtil.isValidNepalMobileNumber(normalizedPhoneNumber)) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Phone number must be 10 digits and start with 98 or 97"));
+                }
+                user.setPhoneNumber(normalizedPhoneNumber);
+            }
 
             userRepository.save(user);
 

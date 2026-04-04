@@ -34,6 +34,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/mobile-content/about").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/pay/*/esewa-redirect").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/pay/*/esewa-callback").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/charity/*/esewa-redirect").permitAll()
