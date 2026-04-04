@@ -271,6 +271,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.xxl,
     padding: SPACING.xxl,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
     ...SHADOWS.card,
   },
   avatarContainer: {
@@ -338,6 +340,8 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
     borderRadius: RADIUS.xl,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
     ...SHADOWS.card,
   },
   menuItem: {
@@ -345,6 +349,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.lg,
+    minHeight: 68,
   },
   menuItemBorder: {
     borderBottomWidth: 1,

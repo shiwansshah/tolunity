@@ -9,6 +9,7 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +20,8 @@ import { getApiErrorMessage } from '../api/apiError';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+
+const logoImage = require('../../assets/images/logo.png');
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -81,13 +84,17 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.logoSection}>
+            <View style={styles.logoBadge}>
+              <Image source={logoImage} style={styles.logoImage} resizeMode="contain" />
+            </View>
             <Text style={styles.logoText}>TolUnity</Text>
-            <Text style={styles.tagline}>Community Management Platform</Text>
+            <Text style={styles.tagline}>Community management, billing, visitors, and alerts in one place.</Text>
           </View>
 
           <View style={styles.card}>
+            <Text style={styles.cardEyebrow}>Sign in</Text>
             <Text style={styles.cardTitle}>Welcome Back</Text>
-            <Text style={styles.cardSubtitle}>Sign in to continue to your community</Text>
+            <Text style={styles.cardSubtitle}>Use your account to continue into the community workspace.</Text>
 
             <InputField
               label="Username"
@@ -179,8 +186,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.xxxl,
   },
+  logoBadge: {
+    width: 92,
+    height: 92,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.lg,
+    ...SHADOWS.card,
+  },
+  logoImage: {
+    width: 62,
+    height: 62,
+  },
   logoText: {
-    fontSize: 42,
+    fontSize: 38,
     fontWeight: '900',
     color: COLORS.primary,
     letterSpacing: -1,
@@ -189,13 +212,31 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs,
-    letterSpacing: 0.3,
+    letterSpacing: 0.1,
+    textAlign: 'center',
+    lineHeight: 19,
+    maxWidth: 280,
   },
   card: {
     backgroundColor: COLORS.bgCard,
     borderRadius: RADIUS.xxl,
     padding: SPACING.xxl,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
     ...SHADOWS.card,
+  },
+  cardEyebrow: {
+    alignSelf: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    backgroundColor: '#ECF1F7',
+    color: COLORS.primary,
+    fontSize: FONTS.sizes.xs,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: SPACING.md,
   },
   cardTitle: {
     fontSize: FONTS.sizes.xxl,
@@ -209,6 +250,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     marginBottom: SPACING.xxl,
+    lineHeight: 20,
   },
   rowBetween: {
     flexDirection: 'row',

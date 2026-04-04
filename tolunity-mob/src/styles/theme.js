@@ -1,49 +1,41 @@
 // TolUnity Design System - Theme
 export const COLORS = {
-  // Primary Brand
-  primary: '#1E3FA0',
-  primaryDark: '#152D78',
-  primaryLight: '#3B5FD4',
-  primaryGradientStart: '#1E3FA0',
-  primaryGradientEnd: '#2B55CC',
+  primary: '#1C4587',
+  primaryDark: '#133260',
+  primaryLight: '#2D5FB4',
+  primaryGradientStart: '#1C4587',
+  primaryGradientEnd: '#2B5AA6',
 
-  // Secondary
-  secondary: '#4A90E2',
-  accent: '#FF6B35',
+  secondary: '#6B7A99',
+  accent: '#C6842E',
 
-  // Backgrounds
-  bgLight: '#EEF2FA',
+  bgLight: '#F4F7FB',
   bgCard: '#FFFFFF',
-  bgInput: '#F7F9FF',
-  bgInputBorder: '#DDE3F0',
+  bgInput: '#F9FBFD',
+  bgInputBorder: '#D4DDE8',
 
-  // Text
-  textPrimary: '#1A1D2E',
-  textSecondary: '#5A6589',
-  textMuted: '#8C95B5',
+  textPrimary: '#1F2D3D',
+  textSecondary: '#526277',
+  textMuted: '#7A889D',
   textLight: '#FFFFFF',
 
-  // Semantic
-  success: '#2ECC71',
-  warning: '#F39C12',
-  error: '#E74C3C',
-  info: '#3498DB',
+  success: '#23845D',
+  warning: '#B87A20',
+  error: '#C4524B',
+  info: '#2C6DB3',
 
-  // Feed
-  feedBg: '#F0F4FF',
-  cardBorder: '#E8EEF8',
-  likePink: '#E91E8C',
-  commentBlue: '#4A90E2',
-  shareGray: '#8C95B5',
+  feedBg: '#F4F7FB',
+  cardBorder: '#D9E2EC',
+  likePink: '#C94D78',
+  commentBlue: '#2C6DB3',
+  shareGray: '#7A889D',
 
-  // Status bar
-  headerBg: '#1E3FA0',
+  headerBg: '#1C4587',
   tabBarBg: '#FFFFFF',
-  tabBarActive: '#1E3FA0',
-  tabBarInactive: '#8C95B5',
+  tabBarActive: '#1C4587',
+  tabBarInactive: '#7A889D',
 
-  // Alert / Complaint FAB
-  fabRed: '#E53935',
+  fabRed: '#D14C44',
 };
 
 export const FONTS = {
@@ -54,9 +46,9 @@ export const FONTS = {
     xs: 11,
     sm: 13,
     md: 15,
-    lg: 17,
-    xl: 20,
-    xxl: 24,
+    lg: 18,
+    xl: 21,
+    xxl: 26,
     xxxl: 32,
     display: 40,
   },
@@ -74,32 +66,32 @@ export const SPACING = {
 
 export const RADIUS = {
   sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
+  md: 14,
+  lg: 18,
+  xl: 22,
   xxl: 24,
   pill: 50,
 };
 
 export const SHADOWS = {
   card: {
-    shadowColor: '#1E3FA0',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#1F2D3D',
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
-    shadowRadius: 16,
+    shadowRadius: 20,
     elevation: 4,
   },
   button: {
-    shadowColor: '#1E3FA0',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowColor: '#1C4587',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
     elevation: 8,
   },
   header: {
-    shadowColor: '#000',
+    shadowColor: '#1F2D3D',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 6,
   },

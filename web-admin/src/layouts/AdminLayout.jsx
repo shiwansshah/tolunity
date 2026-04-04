@@ -1,12 +1,13 @@
 import React from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, CreditCard, LogOut, Shield, Settings, Heart, Flag, ScrollText, QrCode, TriangleAlert, Info } from 'lucide-react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { CalendarDays, CreditCard, Flag, Heart, Info, LayoutDashboard, LogOut, QrCode, ScrollText, Settings, TriangleAlert, Users } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import './AdminLayout.css';
 
 const AdminLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     logout();
@@ -26,15 +27,30 @@ const AdminLayout = () => {
     { path: '/about-tolunity', icon: Info, label: 'Mobile About' },
   ];
 
+  const activeItem = navItems.find((item) => location.pathname.startsWith(item.path)) || navItems[0];
+  const displayDate = new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date());
+  const initials = user?.name
+    ?.split(' ')
+    .map((segment) => segment.charAt(0))
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() || 'AD';
+
   return (
     <div className="admin-container">
-      {/* Sidebar */}
       <aside className="sidebar glass-panel">
         <div className="sidebar-header">
-          <Shield className="logo-icon" size={32} />
-          <h2>TolUnity Admin</h2>
+          <img src="/logo.png" alt="TolUnity" className="brand-logo" />
+          <div>
+            <p className="brand-kicker">TolUnity</p>
+            <h2>Admin Console</h2>
+          </div>
         </div>
-        
+
         <nav className="sidebar-nav">
           {navItems.map((item) => (
             <NavLink
@@ -50,10 +66,10 @@ const AdminLayout = () => {
 
         <div className="sidebar-footer">
           <div className="user-profile">
-            <div className="avatar">{user?.name?.charAt(0) || 'A'}</div>
+            <div className="avatar">{initials}</div>
             <div className="user-info">
               <p className="name">{user?.name}</p>
-              <p className="role">Administrator</p>
+              <p className="role">Administrator Session</p>
             </div>
           </div>
           <button className="logout-btn" onClick={handleLogout}>
@@ -63,15 +79,22 @@ const AdminLayout = () => {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="main-content">
         <header className="topbar glass-panel">
-          <div className="breadcrumb">
-             <span className="text-muted">Welcome back, </span>
-             <strong>{user?.name}</strong>
+          <div className="topbar-main">
+            <p className="topbar-kicker">Operations / {activeItem.label}</p>
+            <div className="topbar-title-row">
+              <h1>{activeItem.label}</h1>
+              <span className="topbar-divider" />
+              <p className="topbar-user">Signed in as {user?.name}</p>
+            </div>
+          </div>
+          <div className="topbar-meta">
+            <CalendarDays size={16} />
+            <span>{displayDate}</span>
           </div>
         </header>
-        
+
         <div className="content-wrapper fade-in">
           <Outlet />
         </div>

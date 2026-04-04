@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { ShieldAlert, LogIn } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import { Card, Button } from '../components/UI';
 import { appConfig } from '../config/appConfig';
@@ -46,11 +46,12 @@ const Login = () => {
 
       <Card className="login-card fade-in">
         <div className="login-header">
-          <div className="logo-circle">
-            <ShieldAlert size={32} color="white" />
+          <div className="login-brand-mark">
+            <img src="/logo.png" alt="TolUnity" className="login-brand-logo" />
           </div>
-          <h2>Admin Access</h2>
-          <p className="text-muted mt-1">Authenticate to manage {appConfig.appName}</p>
+          <span className="login-chip">Admin Access</span>
+          <h2>{appConfig.appName} Control Panel</h2>
+          <p className="text-muted mt-1">Sign in to manage residents, payments, visitors, and mobile content.</p>
         </div>
 
         {error && <div className="error-banner">{error}</div>}

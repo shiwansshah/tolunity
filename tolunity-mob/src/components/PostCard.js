@@ -272,10 +272,12 @@ export default function PostCard({ post, reload, currentUser }) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.bgCard,
-    borderRadius: RADIUS.lg,
+    borderRadius: 20,
     padding: SPACING.lg,
     marginHorizontal: SPACING.lg,
     marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
     ...SHADOWS.card,
   },
   authorRow: {
@@ -306,7 +308,7 @@ const styles = StyleSheet.create({
   },
   authorName: {
     fontSize: FONTS.sizes.md,
-    fontWeight: '700',
+    fontWeight: '800',
     color: COLORS.textPrimary,
     letterSpacing: 0.1,
   },
@@ -318,7 +320,7 @@ const styles = StyleSheet.create({
   content: {
     fontSize: FONTS.sizes.md,
     color: COLORS.textPrimary,
-    lineHeight: 22,
+    lineHeight: 23,
     marginBottom: SPACING.md,
   },
   mediaContainer: {
@@ -348,17 +350,20 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: SPACING.xl,
-    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 8,
+    borderRadius: RADIUS.pill,
+    backgroundColor: '#F6F9FC',
   },
   actionText: {
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
     marginLeft: SPACING.xs,
-    fontWeight: '500',
+    fontWeight: '700',
   },
 });

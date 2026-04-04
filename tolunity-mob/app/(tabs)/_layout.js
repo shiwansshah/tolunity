@@ -118,28 +118,26 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: COLORS.tabBarBg,
-    borderTopWidth: 0,
-    height: 62,
-    paddingBottom: 8,
-    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.cardBorder,
+    height: 68,
+    paddingBottom: 10,
+    paddingTop: 8,
     ...SHADOWS.card,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
   },
   tabLabel: {
     fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    fontWeight: '700',
   },
   iconWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 36,
-    height: 28,
-    borderRadius: 10,
+    width: 38,
+    height: 30,
+    borderRadius: 11,
   },
   iconWrapFocused: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#ECF1F7',
   },
   badge: {
     position: 'absolute',

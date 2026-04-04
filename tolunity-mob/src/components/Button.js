@@ -88,8 +88,8 @@ export default function Button({
 
 const styles = StyleSheet.create({
   base: {
-    height: 54,
-    borderRadius: RADIUS.xl,
+    minHeight: 52,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SPACING.xl,
@@ -100,8 +100,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: FONTS.sizes.md,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: '800',
   },
   iconLeft: {
     marginRight: SPACING.sm,
@@ -124,7 +123,9 @@ const styles = StyleSheet.create({
 
   // Secondary
   secondaryContainer: {
-    backgroundColor: '#E8EDFF',
+    backgroundColor: '#EEF3F8',
+    borderWidth: 1,
+    borderColor: '#D7E0EA',
   },
   secondaryText: {
     color: COLORS.primary,
@@ -132,12 +133,12 @@ const styles = StyleSheet.create({
 
   // Outline
   outlineContainer: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: COLORS.primary,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.2,
+    borderColor: '#CBD7E4',
   },
   outlineText: {
-    color: COLORS.primary,
+    color: COLORS.textPrimary,
   },
 
   // Ghost

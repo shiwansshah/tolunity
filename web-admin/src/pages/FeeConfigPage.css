@@ -1,7 +1,7 @@
 .fee-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .fee-card {
@@ -19,7 +19,7 @@
 .fee-icon {
   width: 48px;
   height: 48px;
-  border-radius: var(--radius-md);
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -38,26 +38,22 @@
 }
 
 .fee-form .input-group input {
-  width: 100%;
-  padding: 0.6rem 0.85rem;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-md);
-  font-size: 0.9rem;
-  transition: var(--transition);
-  outline: none;
+  padding-top: 0.72rem;
+  padding-bottom: 0.72rem;
 }
 
 .fee-form .input-group input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+  box-shadow: 0 0 0 4px rgba(31, 78, 140, 0.08);
 }
 
 .fee-form .input-group label {
   display: block;
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.76rem;
+  font-weight: 700;
   color: var(--text-muted);
   margin-bottom: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .fee-actions {
@@ -67,8 +63,7 @@
 }
 
 .fee-actions .premium-btn {
-  font-size: 0.85rem;
-  padding: 0.5rem 1rem;
+  font-size: 0.88rem;
 }
 
 /* Alert banners */

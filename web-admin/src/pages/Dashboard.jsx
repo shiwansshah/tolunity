@@ -104,12 +104,12 @@ const Dashboard = () => {
         </Card>
 
         <Card className="kpi-card">
-          <div className="kpi-icon" style={{ background: 'linear-gradient(135deg, #E11D48, #F43F5E)' }}>
+          <div className="kpi-icon gradient-danger">
             <Heart size={24} color="#FFF" />
           </div>
           <div className="kpi-info">
             <p className="kpi-label">Charity Fund</p>
-            <h3 className="kpi-value" style={{ color: '#E11D48' }}>
+            <h3 className="kpi-value text-charity">
               {formatNPR(stats.charityTotal)}
             </h3>
           </div>

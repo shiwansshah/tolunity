@@ -2,67 +2,89 @@
 .mt-1 { margin-top: 0.25rem; }
 .text-muted { color: var(--text-muted); }
 
-/* Card */
 .card-container {
   padding: 1.5rem;
   background: var(--surface);
+  border: 1px solid var(--border);
   transition: var(--transition);
 }
 
 .hover-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-xl);
+  border-color: var(--border-strong);
 }
 
-/* Badge */
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.25rem 0.6rem;
-  font-size: 0.75rem;
+  justify-content: center;
+  min-height: 1.75rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   border-radius: 9999px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+  border: 1px solid transparent;
 }
 
-.badge-success { background: var(--success-bg); color: var(--success); }
-.badge-warning { background: var(--warning-bg); color: var(--warning); }
-.badge-danger { background: var(--danger-bg); color: var(--danger); }
-.badge-primary { background: rgba(79, 70, 229, 0.1); color: var(--primary); }
-.badge-gray { background: #F1F5F9; color: var(--text-muted); }
+.badge-success { background: var(--success-bg); color: var(--success); border-color: #cfead8; }
+.badge-warning { background: var(--warning-bg); color: var(--warning); border-color: #f0ddba; }
+.badge-danger { background: var(--danger-bg); color: var(--danger); border-color: #f0cdca; }
+.badge-primary { background: var(--primary-soft); color: var(--primary); border-color: #d3deec; }
+.badge-gray { background: #f1f4f7; color: var(--text-muted); border-color: #dde4ec; }
 
-/* Page Header */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
 .page-title {
-  font-size: 1.8rem;
+  font-size: 2rem;
   font-weight: 800;
-  color: var(--text-main);
-  letter-spacing: -0.02em;
+  color: var(--text-strong);
+  letter-spacing: -0.03em;
 }
 
 .page-subtitle {
   font-size: 0.95rem;
+  line-height: 1.6;
+  max-width: 760px;
 }
 
-/* Base button is .premium-btn in theme.css */
 .btn-secondary {
-  background-color: transparent;
+  background-color: #fff;
   color: var(--text-main);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 .btn-secondary:hover {
-  background-color: var(--surface-hover);
-  box-shadow: var(--shadow-md);
+  background-color: #f8fafc;
+  border-color: var(--border-strong);
 }
 
 .btn-danger {
   background-color: var(--danger);
+  border-color: var(--danger);
   box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.39);
 }
 .btn-danger:hover {
-  background-color: #DC2626;
+  background-color: #b93e39;
+  border-color: #b93e39;
   box-shadow: 0 6px 20px rgba(239, 68, 68, 0.23);
+}
+
+.btn-success {
+  background-color: var(--success);
+  border-color: var(--success);
+  box-shadow: 0 6px 16px rgba(31, 138, 86, 0.18);
+}
+
+.btn-success:hover {
+  background-color: #177148;
+  border-color: #177148;
 }
 
 .spinner {
@@ -79,31 +101,33 @@
   to { transform: rotate(360deg); }
 }
 
-/* Common Data Table Styles */
 .table-responsive {
   width: 100%;
   overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
 }
 
 .data-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+  background: #fff;
 }
 
 .data-table th {
-  padding: 1rem 1.25rem;
-  background-color: var(--surface-hover);
+  padding: 0.95rem 1.1rem;
+  background-color: #f7f9fc;
   color: var(--text-muted);
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 2px solid var(--border);
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--border);
 }
 
 .data-table td {
-  padding: 1.25rem;
+  padding: 1rem 1.1rem;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
@@ -113,7 +137,7 @@
 }
 
 .data-table tbody tr:hover {
-  background-color: rgba(241, 245, 249, 0.5); /* subtle hover */
+  background-color: #f9fbfd;
 }
 
 .row-disabled {
@@ -129,6 +153,6 @@
 
 .filter-section {
   display: flex;
-  gap: 2rem;
+  gap: 1.25rem;
   flex-wrap: wrap;
 }

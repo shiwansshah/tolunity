@@ -1,30 +1,30 @@
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .kpi-card {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: 1rem;
   padding: 1.5rem;
 }
 
 .kpi-icon {
   width: 56px;
   height: 56px;
-  border-radius: var(--radius-lg);
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: var(--shadow-sm);
 }
 
-.gradient-primary { background: linear-gradient(135deg, var(--primary), #8B5CF6); }
-.gradient-success { background: linear-gradient(135deg, var(--success), #34D399); }
-.gradient-warning { background: linear-gradient(135deg, var(--warning), #FBBF24); }
-.gradient-danger { background: linear-gradient(135deg, var(--danger), #F87171); }
+.gradient-primary { background: #2b5d9a; }
+.gradient-success { background: #2a9361; }
+.gradient-warning { background: #bf7c25; }
+.gradient-danger { background: #bf4c56; }
 
 .kpi-info {
   flex: 1;
@@ -42,12 +42,13 @@
 .kpi-value {
   font-size: 1.75rem;
   font-weight: 800;
-  color: var(--text-main);
+  color: var(--text-strong);
   line-height: 1;
 }
 
 .text-success { color: var(--success); }
 .text-danger { color: var(--danger); }
+.text-charity { color: #b34550; }
 
 .dashboard-grid {
   display: grid;
@@ -64,26 +65,27 @@
 .section-title {
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--text-main);
+  color: var(--text-strong);
 }
 
 .report-alert {
   padding: 1.25rem;
-  background: rgba(16, 185, 129, 0.1);
-  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(31, 138, 86, 0.1);
+  border-color: rgba(31, 138, 86, 0.22);
 }
 
 .stats-comparison {
-  display: flex;
-  background: var(--surface-hover);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 1.5rem;
+  padding: 1.25rem;
   margin-top: 1.5rem;
 }
 
 .stat-box {
-  flex: 1;
-  text-align: center;
+  padding: 0.5rem 1rem;
 }
 
 .border-r {
@@ -92,3 +94,14 @@
 
 .text-sm { font-size: 0.8rem; }
 .uppercase { text-transform: uppercase; letter-spacing: 0.05em; }
+
+@media (max-width: 768px) {
+  .stats-comparison {
+    grid-template-columns: 1fr;
+  }
+
+  .border-r {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+}

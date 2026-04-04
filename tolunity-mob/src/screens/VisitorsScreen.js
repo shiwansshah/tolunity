@@ -393,6 +393,9 @@ function CreatorVisitorsWorkspace() {
           value={form[picker.field] || new Date()}
           mode={picker.mode}
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          textColor={COLORS.textPrimary}
+          accentColor={COLORS.primary}
+          themeVariant="light"
           onChange={handlePickerChange}
         />
       ) : null}
@@ -585,20 +588,20 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.sm,
     fontWeight: '700',
     color: COLORS.textPrimary,
-    marginBottom: SPACING.xs,
+    marginBottom: 6,
   },
   dateField: {
     minHeight: 54,
-    borderRadius: RADIUS.md,
-    borderWidth: 1.5,
-    borderColor: COLORS.bgInputBorder,
-    backgroundColor: COLORS.bgInput,
+    borderRadius: 16,
+    borderWidth: 1.2,
+    borderColor: '#C9D4E1',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
   },
-  dateFieldValue: { flex: 1, color: COLORS.textPrimary, fontSize: FONTS.sizes.md, fontWeight: '600' },
+  dateFieldValue: { flex: 1, color: COLORS.textPrimary, fontSize: FONTS.sizes.md, fontWeight: '700' },
   formHint: { color: COLORS.textMuted, marginBottom: SPACING.lg, lineHeight: 18 },
   visitorCard: {
     borderWidth: 1,

@@ -7,6 +7,7 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,8 @@ import { getApiErrorMessage } from '../api/apiError';
 import PostCard from '../components/PostCard';
 import { FEED_PAGE_SIZE } from '../utils/constants';
 import { COLORS, FONTS, SPACING } from '../styles/theme';
+
+const logoImage = require('../../assets/images/logo.png');
 
 export default function FeedScreen() {
   const { user } = useAuth();
@@ -85,7 +88,20 @@ export default function FeedScreen() {
 
   const renderHeader = () => (
     <View style={styles.feedHeader}>
-      <Text style={styles.feedHeaderTitle}>Community Feed</Text>
+      <View style={styles.feedHero}>
+        <View style={styles.feedHeroTop}>
+          <View style={styles.feedHeroText}>
+            <Text style={styles.feedHeaderEyebrow}>Community feed</Text>
+            <Text style={styles.feedHeaderTitle}>Neighborhood Updates</Text>
+            <Text style={styles.feedHeaderSubtitle}>
+              {`See the latest posts, announcements, and shared moments${user?.name ? ` from ${user.name.split(' ')[0]}'s community` : ''}.`}
+            </Text>
+          </View>
+          <View style={styles.feedHeroLogoWrap}>
+            <Image source={logoImage} style={styles.feedHeroLogo} resizeMode="contain" />
+          </View>
+        </View>
+      </View>
     </View>
   );
 
@@ -177,12 +193,52 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.lg,
     paddingBottom: SPACING.md,
   },
-  feedHeaderTitle: {
+  feedHero: {
+    backgroundColor: COLORS.bgCard,
+    borderRadius: 24,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  feedHeroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  feedHeroText: {
+    flex: 1,
+  },
+  feedHeaderEyebrow: {
     fontSize: FONTS.sizes.xs,
-    fontWeight: '600',
-    color: COLORS.textMuted,
+    fontWeight: '800',
+    color: COLORS.primary,
     textTransform: 'uppercase',
     letterSpacing: 1,
+  },
+  feedHeaderTitle: {
+    fontSize: FONTS.sizes.xl,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    marginTop: SPACING.xs,
+  },
+  feedHeaderSubtitle: {
+    marginTop: SPACING.sm,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+  },
+  feedHeroLogoWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    backgroundColor: '#F7FAFD',
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedHeroLogo: {
+    width: 42,
+    height: 42,
   },
   centerLoader: {
     flex: 1,

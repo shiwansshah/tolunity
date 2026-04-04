@@ -9,6 +9,7 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,6 +37,8 @@ const USER_TYPES = [
     bgColor: '#E8FFF0',
   },
 ];
+
+const logoImage = require('../../assets/images/logo.png');
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -112,14 +115,16 @@ export default function RegisterScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Logo */}
           <View style={styles.logoSection}>
+            <View style={styles.logoBadge}>
+              <Image source={logoImage} style={styles.logoImage} resizeMode="contain" />
+            </View>
             <Text style={styles.logoText}>TolUnity</Text>
-            <Text style={styles.tagline}>Community Management Platform</Text>
+            <Text style={styles.tagline}>Create a resident account for your community space.</Text>
           </View>
 
-          {/* Card */}
           <View style={styles.card}>
+            <Text style={styles.cardEyebrow}>Register</Text>
             <Text style={styles.cardTitle}>Create Account</Text>
             <Text style={styles.cardSubtitle}>Self-registration is available for owners and tenants only</Text>
 
@@ -292,8 +297,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.xxl,
   },
+  logoBadge: {
+    width: 92,
+    height: 92,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.lg,
+    ...SHADOWS.card,
+  },
+  logoImage: {
+    width: 62,
+    height: 62,
+  },
   logoText: {
-    fontSize: 42,
+    fontSize: 38,
     fontWeight: '900',
     color: COLORS.primary,
     letterSpacing: -1,
@@ -302,12 +323,30 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs,
+    textAlign: 'center',
+    maxWidth: 280,
+    lineHeight: 19,
   },
   card: {
     backgroundColor: COLORS.bgCard,
     borderRadius: RADIUS.xxl,
     padding: SPACING.xxl,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
     ...SHADOWS.card,
+  },
+  cardEyebrow: {
+    alignSelf: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    backgroundColor: '#ECF1F7',
+    color: COLORS.primary,
+    fontSize: FONTS.sizes.xs,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: SPACING.md,
   },
   cardTitle: {
     fontSize: FONTS.sizes.xxl,
@@ -321,6 +360,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     marginBottom: SPACING.lg,
+    lineHeight: 20,
   },
   sectionLabel: {
     fontSize: FONTS.sizes.sm,
