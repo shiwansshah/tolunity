@@ -4,6 +4,7 @@ import com.shiwans.tolunity.dto.ComplaintDtos.UpdateComplaintStatusRequest;
 import com.shiwans.tolunity.service.AdminServices.AdminAuditService;
 import com.shiwans.tolunity.service.ComplaintService;
 import com.shiwans.tolunity.service.AdminServices.AdminService;
+import com.shiwans.tolunity.service.VisitorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,7 @@ public class AdminController {
     private final AdminService adminService;
     private final AdminAuditService adminAuditService;
     private final ComplaintService complaintService;
+    private final VisitorService visitorService;
 
     @GetMapping("/dashboard")
     public ResponseEntity<?> getDashboardStats() {
@@ -73,6 +75,17 @@ public class AdminController {
     @GetMapping("/audit-logs")
     public ResponseEntity<?> getAuditLogs() {
         return adminAuditService.getAuditLogs();
+    }
+
+    @GetMapping("/visitors")
+    public ResponseEntity<?> getVisitorLog(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Long createdById,
+            @RequestParam(required = false) String visitStatus,
+            @RequestParam(required = false) String search
+    ) {
+        return visitorService.getAdminVisitorLog(page, size, createdById, visitStatus, search);
     }
 
     @GetMapping("/complaints")

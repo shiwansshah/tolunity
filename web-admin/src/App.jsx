@@ -13,6 +13,7 @@ import FeeConfigPage from './pages/FeeConfigPage';
 import CharityPage from './pages/CharityPage';
 import ComplaintsPage from './pages/ComplaintsPage';
 import ActivityLogPage from './pages/ActivityLogPage';
+import VisitorsLogPage from './pages/VisitorsLogPage';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -36,6 +37,7 @@ function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="users" element={<UsersPage />} />
             <Route path="payments" element={<PaymentsReportPage />} />
+            <Route path="visitors" element={<VisitorsLogPage />} />
             <Route path="fee-config" element={<FeeConfigPage />} />
             <Route path="complaints" element={<ComplaintsPage />} />
             <Route path="charity" element={<CharityPage />} />
