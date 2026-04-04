@@ -6,3 +6,5 @@ export const selectOwner = (ownerId) => axiosInstance.post('/user/select-owner',
 export const getMyTenants = () => axiosInstance.get('/user/my-tenants');
 export const removeTenant = (tenantId) => axiosInstance.post(`/user/remove-tenant/${tenantId}`);
 export const hasOwner = () => axiosInstance.get('/user/has-owner');
+export const registerPushToken = (expoPushToken) => axiosInstance.post('/user/profile/push-token', { expoPushToken });
+export const clearPushToken = () => axiosInstance.delete('/user/profile/push-token');

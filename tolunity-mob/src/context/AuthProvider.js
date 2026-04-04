@@ -9,7 +9,7 @@ import {
   storeUser,
   clearStorage,
 } from '../utils/storage';
-import { getMyProfile } from '../api/userApi';
+import { clearPushToken as clearPushTokenApi, getMyProfile } from '../api/userApi';
 import { globalEvent } from '../utils/EventEmitter';
 import { useRouter } from 'expo-router';
 
@@ -81,6 +81,13 @@ export default function AuthProvider({ children }) {
    * Logout: clear storage and state
    */
   const logout = async () => {
+    if (token) {
+      try {
+        await clearPushTokenApi();
+      } catch (error) {
+        console.error('Failed to clear push token during logout:', error);
+      }
+    }
     await clearStorage();
     setToken(null);
     setUser(null);

@@ -23,6 +23,7 @@ import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -36,6 +37,7 @@ public class NotificationService {
     private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
     private final SmsService smsService;
+    private final ExpoPushNotificationService expoPushNotificationService;
 
     @Transactional(readOnly = true)
     public List<NotificationDto> getNotificationsForUser(Long requestedUserId) {
@@ -219,6 +221,16 @@ public class NotificationService {
                 .build();
 
         Notification savedNotification = notificationRepository.save(notification);
+
+        expoPushNotificationService.sendToUser(
+                recipientUserId,
+                savedNotification.getTitle(),
+                savedNotification.getMessage(),
+                Map.of(
+                        "type", savedNotification.getType() != null ? savedNotification.getType().name() : "NOTIFICATION",
+                        "notificationId", savedNotification.getId()
+                )
+        );
 
         if (sendSms) {
             smsService.sendNotificationSms(recipient, savedNotification);

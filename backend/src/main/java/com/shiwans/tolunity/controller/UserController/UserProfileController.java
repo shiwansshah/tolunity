@@ -1,6 +1,7 @@
 package com.shiwans.tolunity.controller.UserController;
 
 import com.shiwans.tolunity.dto.UserDTOs.ChangePasswordRequest;
+import com.shiwans.tolunity.dto.UserDTOs.PushTokenRequest;
 import com.shiwans.tolunity.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -37,5 +38,15 @@ public class UserProfileController {
     @PostMapping("/password/change")
     public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest request) {
         return userService.changePassword(request);
+    }
+
+    @PostMapping("/profile/push-token")
+    public ResponseEntity<?> registerPushToken(@RequestBody PushTokenRequest request) {
+        return userService.registerPushToken(request);
+    }
+
+    @DeleteMapping("/profile/push-token")
+    public ResponseEntity<?> clearPushToken() {
+        return userService.clearPushToken();
     }
 }

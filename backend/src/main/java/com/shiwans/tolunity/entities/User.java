@@ -46,6 +46,9 @@ public class User {
     @Column(name = "profile_pic", columnDefinition = "LONGTEXT")
     private String profilePic; // URL or path to profile picture
 
+    @Column(name = "expo_push_token", length = 255)
+    private String expoPushToken;
+
     @Column(name = "user_role")
     @Enumerated(EnumType.STRING)
     private UserRolesEnum role;       //ROLE_USER, ROLE_ADMIN

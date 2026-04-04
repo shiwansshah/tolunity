@@ -12,6 +12,7 @@ import PaymentsReportPage from './pages/PaymentsReportPage';
 import FeeConfigPage from './pages/FeeConfigPage';
 import CharityPage from './pages/CharityPage';
 import ComplaintsPage from './pages/ComplaintsPage';
+import AlertsPage from './pages/AlertsPage';
 import ActivityLogPage from './pages/ActivityLogPage';
 import VisitorsLogPage from './pages/VisitorsLogPage';
 
@@ -38,6 +39,7 @@ function App() {
             <Route path="users" element={<UsersPage />} />
             <Route path="payments" element={<PaymentsReportPage />} />
             <Route path="visitors" element={<VisitorsLogPage />} />
+            <Route path="alerts" element={<AlertsPage />} />
             <Route path="fee-config" element={<FeeConfigPage />} />
             <Route path="complaints" element={<ComplaintsPage />} />
             <Route path="charity" element={<CharityPage />} />

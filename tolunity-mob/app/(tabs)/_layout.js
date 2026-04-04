@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAlerts } from '../../src/context/AlertContext';
 import { useNotifications } from '../../src/context/NotificationContext';
 import { COLORS, FONTS, SPACING, SHADOWS } from '../../src/styles/theme';
 
@@ -22,7 +23,8 @@ function TabBarIcon({ name, focused, badgeCount = 0 }) {
 }
 
 export default function TabsLayout() {
-  const { unreadCount } = useNotifications();
+  const { unreadCount: alertUnreadCount } = useAlerts();
+  const { unreadCount: notificationUnreadCount } = useNotifications();
 
   return (
     <Tabs
@@ -67,7 +69,17 @@ export default function TabsLayout() {
         options={{
           title: 'Alerts',
           tabBarIcon: ({ focused }) => (
-            <TabBarIcon name="notifications" focused={focused} badgeCount={unreadCount} />
+            <TabBarIcon name="alert-circle" focused={focused} badgeCount={alertUnreadCount} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
+          title: 'Notifications',
+          tabBarIcon: ({ focused }) => (
+            <TabBarIcon name="notifications" focused={focused} badgeCount={notificationUnreadCount} />
           ),
         }}
       />

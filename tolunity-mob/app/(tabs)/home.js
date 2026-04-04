@@ -10,14 +10,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useNotifications } from '../../src/context/NotificationContext';
 import FeedScreen from '../../src/screens/FeedScreen';
 import { COLORS, FONTS, SPACING, SHADOWS } from '../../src/styles/theme';
 
-// Notification badge count (replace with real API)
-const NOTIFICATION_COUNT = 3;
-
 export default function HomeTab() {
   const { user } = useAuth();
+  const { unreadCount } = useNotifications();
   const router = useRouter();
 
   return (
@@ -38,13 +37,13 @@ export default function HomeTab() {
             {/* Notifications */}
             <TouchableOpacity
               style={styles.iconBtn}
-              onPress={() => router.push('/(tabs)/alerts')}
+              onPress={() => router.push('/(tabs)/notifications')}
               activeOpacity={0.8}
             >
               <Ionicons name="notifications" size={22} color="#FFF" />
-              {NOTIFICATION_COUNT > 0 && (
+              {unreadCount > 0 && (
                 <View style={styles.notifBadge}>
-                  <Text style={styles.notifBadgeText}>{NOTIFICATION_COUNT}</Text>
+                  <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
                 </View>
               )}
             </TouchableOpacity>
