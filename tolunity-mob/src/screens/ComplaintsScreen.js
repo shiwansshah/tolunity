@@ -1,44 +1,49 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  StatusBar,
-  Modal,
-  TextInput,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
+  Alert,
+  FlatList,
   Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { MediaTypeOptions } from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNotifications } from '../context/NotificationContext';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import { createComplaint, getComplaints, toggleComplaintUpvote } from '../api/complaintApi';
 import { getApiErrorMessage } from '../api/apiError';
+import Button from '../components/Button';
+import EmptyState from '../components/EmptyState';
+import InputField from '../components/InputField';
+import ScreenHeader from '../components/ScreenHeader';
+import SurfaceCard from '../components/SurfaceCard';
+import { useNotifications } from '../context/NotificationContext';
+import { COLORS, FONTS, RADIUS, SPACING } from '../styles/theme';
 
 const CATEGORIES = ['Sanitation', 'Safety', 'Infrastructure', 'Noise', 'Water', 'Other'];
 const STATUS_COLORS = {
-  OPEN: { bg: '#FFF7E6', text: COLORS.warning },
-  UNDER_REVIEW: { bg: '#EEF2FF', text: COLORS.primary },
-  IN_PROGRESS: { bg: '#EEF2FF', text: COLORS.primary },
-  RESOLVED: { bg: '#E8FFF0', text: COLORS.success },
-  CLOSED: { bg: '#F5F7FB', text: COLORS.textMuted },
+  OPEN: { bg: COLORS.surfaceWarning, text: COLORS.warning },
+  UNDER_REVIEW: { bg: COLORS.surfacePrimary, text: COLORS.primary },
+  IN_PROGRESS: { bg: COLORS.surfacePrimary, text: COLORS.primary },
+  RESOLVED: { bg: COLORS.surfaceSuccess, text: COLORS.success },
+  CLOSED: { bg: COLORS.surfaceMuted, text: COLORS.textMuted },
 };
 
-const formatStatus = (status) =>
+const formatStatus = (status) => (
   (status || 'OPEN')
     .toLowerCase()
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+    .join(' ')
+);
 
 export default function ComplaintsScreen() {
   const { refreshNotifications } = useNotifications();
@@ -71,7 +76,8 @@ export default function ComplaintsScreen() {
   const pickMedia = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      return Alert.alert('Permission Required', 'Media permission is required to attach photos or videos.');
+      Alert.alert('Permission Required', 'Media permission is required to attach photos or videos.');
+      return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -88,7 +94,8 @@ export default function ComplaintsScreen() {
 
   const submitComplaint = async () => {
     if (!title.trim() || !description.trim()) {
-      return Alert.alert('Validation', 'Title and description are required.');
+      Alert.alert('Validation', 'Title and description are required.');
+      return;
     }
 
     setSaving(true);
@@ -139,11 +146,11 @@ export default function ComplaintsScreen() {
   const renderComplaint = ({ item }) => {
     const statusConfig = STATUS_COLORS[item.status] || STATUS_COLORS.OPEN;
     return (
-      <View style={styles.card}>
-        <View style={styles.rowBetween}>
-          <View style={{ flex: 1 }}>
+      <SurfaceCard style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardHeaderText}>
             <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardMeta}>{item.category} • by {item.createdByName}</Text>
+            <Text style={styles.cardMeta}>{`${item.category} | by ${item.createdByName}`}</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
             <Text style={[styles.statusText, { color: statusConfig.text }]}>{formatStatus(item.status)}</Text>
@@ -152,49 +159,56 @@ export default function ComplaintsScreen() {
 
         <Text style={styles.description}>{item.description}</Text>
 
-        {item.mediaList?.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SPACING.md }}>
+        {item.mediaList?.length ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaStrip}>
             {item.mediaList.map((media) => (
-              <View key={media.id} style={styles.mediaCard}>
+              <View key={media.id} style={styles.mediaItem}>
                 {media.mediaType === 'IMAGE' ? (
                   <Image source={{ uri: media.mediaUrl }} style={styles.mediaImage} />
                 ) : (
                   <View style={styles.videoPlaceholder}>
-                    <Ionicons name="videocam" size={22} color="#FFF" />
                     <Text style={styles.videoText}>Video</Text>
                   </View>
                 )}
               </View>
             ))}
           </ScrollView>
-        )}
+        ) : null}
 
-        <View style={styles.rowBetween}>
-          <TouchableOpacity style={[styles.voteBtn, item.upvotedByCurrentUser && styles.voteBtnActive]} onPress={() => upvote(item.id)}>
-            <Ionicons name={item.upvotedByCurrentUser ? 'arrow-up-circle' : 'arrow-up-circle-outline'} size={18} color={item.upvotedByCurrentUser ? '#FFF' : COLORS.primary} />
-            <Text style={[styles.voteText, item.upvotedByCurrentUser && styles.voteTextActive]}>{item.upvoteCount}</Text>
+        <View style={styles.footerRow}>
+          <TouchableOpacity
+            style={[styles.voteButton, item.upvotedByCurrentUser && styles.voteButtonActive]}
+            onPress={() => upvote(item.id)}
+          >
+            <Text style={[styles.voteText, item.upvotedByCurrentUser && styles.voteTextActive]}>
+              {item.upvoteCount} support
+            </Text>
           </TouchableOpacity>
           <Text style={styles.cardMeta}>{item.updatedAt ? new Date(item.updatedAt).toLocaleString() : ''}</Text>
         </View>
 
-        <View style={styles.followUpBox}>
+        <View style={styles.followUp}>
           <Text style={styles.followUpTitle}>Follow up contact</Text>
-          <Text style={styles.followUpText}>
-            {item.followUpContact?.name} • {item.followUpContact?.phoneNumber}
-          </Text>
-          <Text style={styles.followUpText}>{item.followUpContact?.email}</Text>
+          <Text style={styles.followUpText}>{item.followUpContact?.name || 'Awaiting assignment'}</Text>
+          <Text style={styles.followUpText}>{item.followUpContact?.phoneNumber || ''}</Text>
+          <Text style={styles.followUpText}>{item.followUpContact?.email || ''}</Text>
           <Text style={styles.followUpText}>{item.resolutionNote || 'Awaiting admin review'}</Text>
         </View>
-      </View>
+      </SurfaceCard>
     );
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Complaints</Text>
-      </View>
+      <ScreenHeader
+        title="Complaints"
+        right={(
+          <TouchableOpacity style={styles.headerAction} onPress={() => setModalVisible(true)}>
+            <Text style={styles.headerActionText}>New</Text>
+          </TouchableOpacity>
+        )}
+      />
 
       {loading ? (
         <View style={styles.loader}>
@@ -205,62 +219,61 @@ export default function ComplaintsScreen() {
           data={complaints}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderComplaint}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="flag-outline" size={44} color={COLORS.textMuted} />
-              <Text style={styles.emptyText}>No complaints posted yet</Text>
-            </View>
-          }
+          ListEmptyComponent={(
+            <EmptyState
+              title="No complaints posted yet"
+              description="Resident complaints and follow-up details will appear here."
+              icon={<Ionicons name="flag-outline" size={32} color={COLORS.textMuted} />}
+            />
+          )}
         />
       )}
 
-      <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
-        <Ionicons name="add" size={28} color="#FFF" />
-      </TouchableOpacity>
-
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <View style={styles.modalCard}>
-            <View style={styles.rowBetween}>
-              <Text style={styles.modalTitle}>File Complaint</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color={COLORS.textMuted} />
+        <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.sheet}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>File Complaint</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeButton}>
+                <Ionicons name="close" size={20} color={COLORS.textPrimary} />
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <TextInput
-                style={styles.input}
+              <InputField
+                label="Title"
                 placeholder="Complaint title"
-                placeholderTextColor={COLORS.textMuted}
                 value={title}
                 onChangeText={setTitle}
               />
+              <Text style={styles.sectionLabel}>Category</Text>
               <View style={styles.chips}>
                 {CATEGORIES.map((item) => (
-                  <TouchableOpacity key={item} style={[styles.chip, category === item && styles.chipActive]} onPress={() => setCategory(item)}>
+                  <TouchableOpacity
+                    key={item}
+                    style={[styles.chip, category === item && styles.chipActive]}
+                    onPress={() => setCategory(item)}
+                  >
                     <Text style={[styles.chipText, category === item && styles.chipTextActive]}>{item}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-              <TextInput
-                style={[styles.input, styles.textArea]}
+              <InputField
+                label="Description"
                 placeholder="Describe the issue"
-                placeholderTextColor={COLORS.textMuted}
                 value={description}
                 onChangeText={setDescription}
                 multiline
               />
 
-              {mediaAssets.length > 0 && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SPACING.md }}>
+              {mediaAssets.length > 0 ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaStrip}>
                   {mediaAssets.map((asset, index) => (
-                    <View key={`${asset.uri}-${index}`} style={styles.mediaCard}>
+                    <View key={`${asset.uri}-${index}`} style={styles.mediaItem}>
                       {asset.type === 'video' ? (
                         <View style={styles.videoPlaceholder}>
-                          <Ionicons name="videocam" size={22} color="#FFF" />
                           <Text style={styles.videoText}>Video</Text>
                         </View>
                       ) : (
@@ -269,16 +282,13 @@ export default function ComplaintsScreen() {
                     </View>
                   ))}
                 </ScrollView>
-              )}
+              ) : null}
 
-              <TouchableOpacity style={styles.attachBtn} onPress={pickMedia}>
-                <Ionicons name="images-outline" size={18} color={COLORS.primary} />
-                <Text style={styles.attachBtnText}>Attach Photos / Videos</Text>
+              <TouchableOpacity style={styles.attachButton} onPress={pickMedia}>
+                <Text style={styles.attachButtonText}>Attach photo or video</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.submitBtn} onPress={submitComplaint} disabled={saving}>
-                {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitBtnText}>Submit Complaint</Text>}
-              </TouchableOpacity>
+              <Button title="Submit Complaint" onPress={submitComplaint} loading={saving} />
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -288,44 +298,212 @@ export default function ComplaintsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.feedBg },
-  header: { backgroundColor: COLORS.primary, padding: SPACING.lg, ...SHADOWS.header },
-  headerTitle: { color: '#FFF', fontSize: FONTS.sizes.xl, fontWeight: '800' },
-  listContent: { padding: SPACING.lg, paddingBottom: 100 },
-  loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  card: { backgroundColor: COLORS.bgCard, borderRadius: RADIUS.lg, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOWS.card },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardTitle: { fontSize: FONTS.sizes.md, fontWeight: '800', color: COLORS.textPrimary },
-  cardMeta: { marginTop: 4, color: COLORS.textMuted, fontSize: FONTS.sizes.xs },
-  description: { marginTop: SPACING.md, marginBottom: SPACING.md, color: COLORS.textSecondary, lineHeight: 20 },
-  statusBadge: { borderRadius: RADIUS.pill, paddingHorizontal: SPACING.sm, paddingVertical: 5, marginLeft: SPACING.sm },
-  statusText: { fontSize: 10, fontWeight: '800' },
-  mediaCard: { width: 90, height: 90, borderRadius: RADIUS.md, overflow: 'hidden', marginRight: SPACING.sm, backgroundColor: '#000' },
-  mediaImage: { width: '100%', height: '100%' },
-  videoPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary },
-  videoText: { color: '#FFF', fontSize: FONTS.sizes.xs, marginTop: 4 },
-  voteBtn: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary, borderRadius: RADIUS.pill, paddingHorizontal: SPACING.md, paddingVertical: 6, gap: SPACING.xs },
-  voteBtnActive: { backgroundColor: COLORS.primary },
-  voteText: { color: COLORS.primary, fontWeight: '800' },
-  voteTextActive: { color: '#FFF' },
-  followUpBox: { marginTop: SPACING.md, paddingTop: SPACING.md, borderTopWidth: 1, borderTopColor: COLORS.cardBorder },
-  followUpTitle: { fontSize: FONTS.sizes.sm, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 4 },
-  followUpText: { color: COLORS.textSecondary, fontSize: FONTS.sizes.xs, lineHeight: 18 },
-  empty: { alignItems: 'center', paddingTop: SPACING.xxxl * 2 },
-  emptyText: { marginTop: SPACING.md, color: COLORS.textSecondary },
-  fab: { position: 'absolute', right: SPACING.xl, bottom: SPACING.xl, width: 58, height: 58, borderRadius: 29, backgroundColor: COLORS.fabRed, alignItems: 'center', justifyContent: 'center', ...SHADOWS.button },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: COLORS.bgCard, borderTopLeftRadius: RADIUS.xxl, borderTopRightRadius: RADIUS.xxl, padding: SPACING.xxl, maxHeight: '88%' },
-  modalTitle: { fontSize: FONTS.sizes.xl, fontWeight: '800', color: COLORS.textPrimary },
-  input: { backgroundColor: COLORS.bgInput, borderWidth: 1, borderColor: COLORS.bgInputBorder, borderRadius: RADIUS.md, padding: SPACING.md, color: COLORS.textPrimary, marginTop: SPACING.lg, marginBottom: SPACING.md },
-  textArea: { minHeight: 110, textAlignVertical: 'top' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.md },
-  chip: { backgroundColor: COLORS.bgInput, borderWidth: 1, borderColor: COLORS.bgInputBorder, borderRadius: RADIUS.pill, paddingHorizontal: SPACING.md, paddingVertical: 8 },
-  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  chipText: { color: COLORS.textSecondary, fontWeight: '700', fontSize: FONTS.sizes.xs },
-  chipTextActive: { color: '#FFF' },
-  attachBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, borderWidth: 1, borderColor: COLORS.primary, borderRadius: RADIUS.md, paddingVertical: SPACING.md, marginBottom: SPACING.md },
-  attachBtnText: { color: COLORS.primary, fontWeight: '700' },
-  submitBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: SPACING.lg, alignItems: 'center' },
-  submitBtnText: { color: '#FFF', fontWeight: '800', fontSize: FONTS.sizes.md },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.feedBg,
+  },
+  headerAction: {
+    minWidth: 64,
+    height: 36,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.whiteOverlay,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerActionText: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textLight,
+    fontWeight: FONTS.weights.bold,
+  },
+  loader: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
+    padding: SPACING.md,
+    paddingBottom: SPACING.xl,
+  },
+  card: {
+    marginBottom: SPACING.xs,
+    padding: SPACING.sm,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: SPACING.xs,
+  },
+  cardHeaderText: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.semibold,
+    color: COLORS.textPrimary,
+  },
+  cardMeta: {
+    marginTop: 4,
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textMuted,
+  },
+  statusBadge: {
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    alignSelf: 'flex-start',
+  },
+  statusText: {
+    fontSize: FONTS.sizes.xs,
+    fontWeight: FONTS.weights.bold,
+  },
+  description: {
+    marginTop: SPACING.xs,
+    fontSize: FONTS.sizes.sm,
+    color: COLORS.textSecondary,
+    lineHeight: 22,
+  },
+  mediaStrip: {
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  mediaItem: {
+    width: 96,
+    height: 96,
+    marginRight: SPACING.xs,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+    backgroundColor: COLORS.black,
+  },
+  mediaImage: {
+    width: '100%',
+    height: '100%',
+  },
+  videoPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+  },
+  videoText: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textLight,
+    fontWeight: FONTS.weights.bold,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: SPACING.xs,
+  },
+  voteButton: {
+    minHeight: 36,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    justifyContent: 'center',
+  },
+  voteButtonActive: {
+    backgroundColor: COLORS.primary,
+  },
+  voteText: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.primary,
+    fontWeight: FONTS.weights.bold,
+  },
+  voteTextActive: {
+    color: COLORS.textLight,
+  },
+  followUp: {
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.cardBorder,
+  },
+  followUpTitle: {
+    fontSize: FONTS.sizes.sm,
+    color: COLORS.textPrimary,
+    fontWeight: FONTS.weights.semibold,
+    marginBottom: 4,
+  },
+  followUpText: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textSecondary,
+    lineHeight: 18,
+  },
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: COLORS.overlay,
+  },
+  sheet: {
+    maxHeight: '88%',
+    backgroundColor: COLORS.bgCard,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    padding: SPACING.md,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.sm,
+  },
+  sheetTitle: {
+    fontSize: FONTS.sizes.lg,
+    color: COLORS.textPrimary,
+    fontWeight: FONTS.weights.bold,
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionLabel: {
+    marginBottom: SPACING.xs,
+    fontSize: FONTS.sizes.sm,
+    color: COLORS.textPrimary,
+    fontWeight: FONTS.weights.semibold,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+    marginBottom: SPACING.sm,
+  },
+  chip: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.bgInput,
+    borderWidth: 1,
+    borderColor: COLORS.bgInputBorder,
+  },
+  chipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  chipText: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textSecondary,
+    fontWeight: FONTS.weights.semibold,
+  },
+  chipTextActive: {
+    color: COLORS.textLight,
+  },
+  attachButton: {
+    minHeight: 48,
+    marginBottom: SPACING.sm,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachButtonText: {
+    fontSize: FONTS.sizes.sm,
+    color: COLORS.primary,
+    fontWeight: FONTS.weights.semibold,
+  },
 });

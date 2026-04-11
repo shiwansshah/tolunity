@@ -1,26 +1,29 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Alert,
-  StatusBar,
+  Image,
   KeyboardAvoidingView,
   Platform,
-  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { MediaTypeOptions } from 'expo-image-picker';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { editPost } from '../api/feedApi';
+import { Ionicons } from '@expo/vector-icons';
 import { getApiErrorMessage } from '../api/apiError';
-import InputField from '../components/InputField';
+import { editPost } from '../api/feedApi';
 import Button from '../components/Button';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import Container from '../components/Container';
+import InputField from '../components/InputField';
+import ScreenHeader from '../components/ScreenHeader';
+import SurfaceCard from '../components/SurfaceCard';
+import { COLORS, FONTS, RADIUS, SPACING } from '../styles/theme';
 
 export default function EditPostScreen() {
   const router = useRouter();
@@ -110,169 +113,118 @@ export default function EditPostScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Post</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View style={styles.card}>
-            <Text style={styles.label}>Edit your post</Text>
+      <ScreenHeader title="Edit Post" onBack={() => router.back()} />
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Container scroll contentStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <SurfaceCard style={styles.card}>
             <InputField
-              placeholder="What's on your mind?"
+              label="Post"
+              placeholder="Update your post"
               value={content}
               onChangeText={setContent}
-              iconName="create-outline"
               autoCapitalize="sentences"
+              multiline
             />
-          </View>
+          </SurfaceCard>
 
-          {mediaAssets.length > 0 && (
-            <View style={styles.mediaPreviewContainer}>
+          {mediaAssets.length > 0 ? (
+            <SurfaceCard style={styles.mediaCard}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {mediaAssets.map((asset, index) => (
-                  <View key={index} style={styles.mediaWrapper}>
-                    <Image source={{ uri: asset.uri || asset.mediaUrl }} style={styles.mediaThumbnail} />
-                    {(asset.type === 'video' || asset.mediaType === 'VIDEO') && (
-                      <View style={styles.playIconOverlay}>
-                        <Ionicons name="play" size={24} color="#FFF" />
+                  <View key={`${asset.uri || asset.mediaUrl}-${index}`} style={styles.mediaItem}>
+                    <Image source={{ uri: asset.uri || asset.mediaUrl }} style={styles.mediaImage} />
+                    {(asset.type === 'video' || asset.mediaType === 'VIDEO') ? (
+                      <View style={styles.videoBadge}>
+                        <Ionicons name="play" size={14} color={COLORS.textLight} />
                       </View>
-                    )}
-                    <TouchableOpacity style={styles.removeMediaBtn} onPress={() => removeMedia(index)}>
-                      <Ionicons name="close" size={16} color="#FFF" />
+                    ) : null}
+                    <TouchableOpacity style={styles.removeButton} onPress={() => removeMedia(index)}>
+                      <Ionicons name="close" size={16} color={COLORS.textLight} />
                     </TouchableOpacity>
                   </View>
                 ))}
               </ScrollView>
-            </View>
-          )}
+            </SurfaceCard>
+          ) : null}
 
-          <TouchableOpacity style={styles.attachBtn} onPress={pickMedia} activeOpacity={0.8}>
-            <View style={styles.attachIconWrap}>
-              <Ionicons name="image-outline" size={24} color={COLORS.primary} />
-            </View>
-            <Text style={styles.attachText}>Add Photo/Video</Text>
+          <TouchableOpacity style={styles.attachRow} onPress={pickMedia} activeOpacity={0.8}>
+            <Text style={styles.attachText}>Add photo or video</Text>
           </TouchableOpacity>
 
-          <Button
-            title="Save Changes"
-            onPress={handleSave}
-            loading={loading}
-            iconName="checkmark-outline"
-            iconPosition="left"
-            style={styles.saveBtn}
-          />
-
+          <Button title="Save Changes" onPress={handleSave} loading={loading} style={styles.primaryAction} />
           <Button title="Cancel" onPress={() => router.back()} variant="outline" />
-        </ScrollView>
+        </Container>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.feedBg },
-  flex: { flex: 1 },
-  header: {
-    backgroundColor: COLORS.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    ...SHADOWS.header,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.feedBg,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+  flex: {
+    flex: 1,
   },
-  headerTitle: { fontSize: FONTS.sizes.lg, fontWeight: '700', color: '#FFF' },
-  content: { padding: SPACING.lg, paddingBottom: SPACING.xxxl },
+  content: {
+    paddingBottom: SPACING.xl,
+  },
   card: {
-    backgroundColor: COLORS.bgCard,
-    borderRadius: RADIUS.xl,
-    padding: SPACING.xl,
-    marginBottom: SPACING.md,
-    ...SHADOWS.card,
+    marginBottom: SPACING.sm,
   },
-  label: {
-    fontSize: FONTS.sizes.lg,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.md,
+  mediaCard: {
+    marginBottom: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    paddingLeft: SPACING.sm,
   },
-  saveBtn: { marginBottom: SPACING.md },
-  attachBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.bgCard,
-    padding: SPACING.lg,
-    borderRadius: RADIUS.xl,
-    marginBottom: SPACING.xl,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: COLORS.cardBorder,
+  mediaItem: {
+    marginRight: SPACING.xs,
   },
-  attachIconWrap: {
-    width: 40,
-    height: 40,
+  mediaImage: {
+    width: 104,
+    height: 104,
     borderRadius: RADIUS.md,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: COLORS.black,
+  },
+  videoBadge: {
+    position: 'absolute',
+    left: 8,
+    bottom: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.overlaySoft,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
+  },
+  removeButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.overlay,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachRow: {
+    minHeight: 48,
+    marginBottom: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.bgInputBorder,
+    backgroundColor: COLORS.bgCard,
+    justifyContent: 'center',
   },
   attachText: {
     fontSize: FONTS.sizes.md,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
+    color: COLORS.primary,
+    fontWeight: FONTS.weights.semibold,
   },
-  mediaPreviewContainer: {
-    marginBottom: SPACING.md,
-  },
-  mediaWrapper: {
-    marginRight: SPACING.md,
-    position: 'relative',
-  },
-  mediaThumbnail: {
-    width: 100,
-    height: 100,
-    borderRadius: RADIUS.lg,
-    backgroundColor: '#000',
-  },
-  playIconOverlay: {
-    position: 'absolute',
-    top: 38,
-    left: 38,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  removeMediaBtn: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  primaryAction: {
+    marginBottom: SPACING.xs,
   },
 });

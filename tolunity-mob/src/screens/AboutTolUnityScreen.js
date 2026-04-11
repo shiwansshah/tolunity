@@ -1,22 +1,24 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   ActivityIndicator,
-  StatusBar,
   Image,
   RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Video, ResizeMode } from 'expo-av';
-import { getAboutContent } from '../api/mobileContentApi';
 import { getApiErrorMessage } from '../api/apiError';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { getAboutContent } from '../api/mobileContentApi';
+import EmptyState from '../components/EmptyState';
+import ScreenHeader from '../components/ScreenHeader';
+import SurfaceCard from '../components/SurfaceCard';
+import { COLORS, FONTS, RADIUS, SPACING } from '../styles/theme';
 
 export default function AboutTolUnityScreen() {
   const router = useRouter();
@@ -53,14 +55,7 @@ export default function AboutTolUnityScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>About TolUnity</Text>
-        <View style={styles.backBtn} />
-      </View>
+      <ScreenHeader title="About TolUnity" onBack={() => router.back()} />
 
       {loading ? (
         <View style={styles.loader}>
@@ -69,13 +64,20 @@ export default function AboutTolUnityScreen() {
       ) : (
         <ScrollView
           contentContainerStyle={styles.content}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
-            setRefreshing(true);
-            fetchContent({ silent: true });
-          }} />}
           showsVerticalScrollIndicator={false}
+          refreshControl={(
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                fetchContent({ silent: true });
+              }}
+              colors={[COLORS.primary]}
+              tintColor={COLORS.primary}
+            />
+          )}
         >
-          <View style={styles.card}>
+          <SurfaceCard style={styles.card}>
             <Text style={styles.title}>{content?.title || 'About TolUnity'}</Text>
             <Text style={styles.description}>
               {content?.description || 'TolUnity helps communities manage communication, payments, visitors, complaints, and emergency updates in one place.'}
@@ -83,29 +85,28 @@ export default function AboutTolUnityScreen() {
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            {mediaItems.map((media, index) => (
+            {mediaItems.length ? mediaItems.map((media, index) => (
               <View key={media.id || `${media.mediaType}-${index}`} style={styles.mediaCard}>
                 {media.mediaType === 'VIDEO' ? (
                   <Video
                     source={{ uri: media.mediaUrl }}
-                    style={styles.mediaVideo}
+                    style={styles.media}
                     useNativeControls
                     resizeMode={ResizeMode.COVER}
                     isLooping={false}
                   />
                 ) : (
-                  <Image source={{ uri: media.mediaUrl }} style={styles.mediaImage} />
+                  <Image source={{ uri: media.mediaUrl }} style={styles.media} />
                 )}
               </View>
-            ))}
-
-            {mediaItems.length === 0 && (
-              <View style={styles.emptyMedia}>
-                <Ionicons name="information-circle-outline" size={36} color={COLORS.textMuted} />
-                <Text style={styles.emptyMediaText}>No media has been added yet.</Text>
-              </View>
+            )) : (
+              <EmptyState
+                title="No media available"
+                description="Media for this page has not been added yet."
+                icon={<Ionicons name="information-circle-outline" size={28} color={COLORS.textMuted} />}
+              />
             )}
-          </View>
+          </SurfaceCard>
         </ScrollView>
       )}
     </SafeAreaView>
@@ -117,81 +118,42 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.feedBg,
   },
-  header: {
-    backgroundColor: COLORS.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    ...SHADOWS.header,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: FONTS.sizes.lg,
-    fontWeight: '700',
-    color: '#FFF',
-  },
   loader: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   content: {
-    padding: SPACING.lg,
-    paddingBottom: SPACING.xxxl,
+    padding: SPACING.md,
+    paddingBottom: SPACING.xl,
   },
   card: {
-    backgroundColor: COLORS.bgCard,
-    borderRadius: RADIUS.xxl,
-    padding: SPACING.xl,
-    ...SHADOWS.card,
+    padding: SPACING.md,
   },
   title: {
     fontSize: FONTS.sizes.xxl,
-    fontWeight: '800',
+    fontWeight: FONTS.weights.heavy,
     color: COLORS.textPrimary,
-    marginBottom: SPACING.md,
   },
   description: {
+    marginTop: SPACING.xs,
     fontSize: FONTS.sizes.md,
     lineHeight: 24,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.lg,
   },
   errorText: {
+    marginTop: SPACING.sm,
+    fontSize: FONTS.sizes.sm,
     color: COLORS.error,
-    marginBottom: SPACING.md,
   },
   mediaCard: {
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    backgroundColor: '#000',
-    marginBottom: SPACING.md,
-  },
-  mediaImage: {
-    width: '100%',
-    height: 220,
-  },
-  mediaVideo: {
-    width: '100%',
-    height: 220,
-  },
-  emptyMedia: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.xxl,
-    backgroundColor: '#F8FAFC',
-    borderRadius: RADIUS.lg,
-  },
-  emptyMediaText: {
     marginTop: SPACING.sm,
-    color: COLORS.textMuted,
-    fontSize: FONTS.sizes.sm,
+    overflow: 'hidden',
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.black,
+  },
+  media: {
+    width: '100%',
+    height: 220,
   },
 });

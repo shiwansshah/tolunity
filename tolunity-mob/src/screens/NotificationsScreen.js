@@ -1,27 +1,30 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  StatusBar,
   ActivityIndicator,
+  FlatList,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import EmptyState from '../components/EmptyState';
+import ScreenHeader from '../components/ScreenHeader';
+import SurfaceCard from '../components/SurfaceCard';
 import { useNotifications } from '../context/NotificationContext';
+import { COLORS, FONTS, RADIUS, SPACING } from '../styles/theme';
 
 const TYPE_META = {
-  LIKE: { label: 'Like', icon: 'heart', color: COLORS.likePink },
-  COMMENT: { label: 'Comment', icon: 'chatbubble', color: COLORS.primary },
-  PAYMENT: { label: 'Payment', icon: 'card', color: COLORS.success },
-  RENT: { label: 'Rent', icon: 'home', color: COLORS.info },
-  ALERT: { label: 'Alert', icon: 'alert-circle', color: COLORS.error },
-  DONATION: { label: 'Donation', icon: 'heart-circle', color: '#C2416C' },
-  COMPLAINT: { label: 'Complaint', icon: 'flag', color: COLORS.warning },
-  FEE: { label: 'Fee', icon: 'receipt', color: COLORS.primary },
+  LIKE: { label: 'Like', icon: 'heart-outline', color: COLORS.likePink },
+  COMMENT: { label: 'Comment', icon: 'chatbubble-outline', color: COLORS.primary },
+  PAYMENT: { label: 'Payment', icon: 'card-outline', color: COLORS.success },
+  RENT: { label: 'Rent', icon: 'home-outline', color: COLORS.info },
+  ALERT: { label: 'Alert', icon: 'alert-circle-outline', color: COLORS.error },
+  DONATION: { label: 'Donation', icon: 'card-outline', color: COLORS.likePink },
+  COMPLAINT: { label: 'Complaint', icon: 'flag-outline', color: COLORS.warning },
+  FEE: { label: 'Fee', icon: 'receipt-outline', color: COLORS.primary },
 };
 
 const formatRelativeTime = (value) => {
@@ -38,7 +41,6 @@ const formatRelativeTime = (value) => {
   if (diffHours < 24) return `${diffHours} hr${diffHours > 1 ? 's' : ''} ago`;
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays} days ago`;
-
   return date.toLocaleDateString();
 };
 
@@ -52,44 +54,40 @@ export default function NotificationsScreen() {
     markAllAsRead,
   } = useNotifications();
 
-  const renderNotification = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.card, item.isRead ? styles.cardRead : styles.cardUnread]}
-      onPress={() => markAsRead(item.id)}
-      activeOpacity={0.85}
-    >
-      {!item.isRead && <View style={styles.unreadDot} />}
-      <View style={[styles.iconWrap, { backgroundColor: `${(TYPE_META[item.type]?.color || COLORS.primary)}20` }]}>
-        <Ionicons name={TYPE_META[item.type]?.icon || 'notifications'} size={22} color={TYPE_META[item.type]?.color || COLORS.primary} />
-      </View>
-      <View style={styles.info}>
-        <View style={styles.topRow}>
-          <Text style={[styles.typeTag, item.isRead && styles.typeTagRead]}>{TYPE_META[item.type]?.label || item.type || 'Notification'}</Text>
-          <Text style={styles.time}>{formatRelativeTime(item.createdAt)}</Text>
-        </View>
-        <Text style={[styles.title, item.isRead && styles.titleRead]}>{item.title}</Text>
-        <Text style={[styles.message, item.isRead && styles.messageRead]} numberOfLines={3}>{item.message}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderNotification = ({ item }) => {
+    const meta = TYPE_META[item.type] || { label: item.type || 'Notification', icon: 'notifications-outline', color: COLORS.primary };
+
+    return (
+      <SurfaceCard style={[styles.card, !item.isRead && styles.cardUnread]}>
+        <TouchableOpacity style={styles.pressable} onPress={() => markAsRead(item.id)} activeOpacity={0.85}>
+          <View style={[styles.iconWrap, { backgroundColor: COLORS.surfaceSoft }]}>
+            <Ionicons name={meta.icon} size={18} color={meta.color} />
+          </View>
+          <View style={styles.info}>
+            <View style={styles.topRow}>
+              <Text style={styles.type}>{meta.label}</Text>
+              <Text style={styles.time}>{formatRelativeTime(item.createdAt)}</Text>
+            </View>
+            <Text style={styles.title}>{item.title}</Text>
+            <Text style={styles.message} numberOfLines={3}>{item.message}</Text>
+          </View>
+        </TouchableOpacity>
+      </SurfaceCard>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Notifications</Text>
-          <Text style={styles.headerSubtitle}>Routine activity, payment, complaint, and community updates</Text>
-          {unreadCount > 0 && (
-            <Text style={styles.unreadLabel}>{unreadCount} unread</Text>
-          )}
-        </View>
-        {unreadCount > 0 && (
-          <TouchableOpacity onPress={markAllAsRead} style={styles.markAllBtn}>
-            <Text style={styles.markAllText}>Mark all read</Text>
+      <ScreenHeader
+        title="Notifications"
+        subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+        right={unreadCount > 0 ? (
+          <TouchableOpacity style={styles.headerAction} onPress={markAllAsRead}>
+            <Text style={styles.headerActionText}>Mark all</Text>
           </TouchableOpacity>
-        )}
-      </View>
+        ) : null}
+      />
 
       {loading && notifications.length === 0 ? (
         <View style={styles.loader}>
@@ -100,16 +98,17 @@ export default function NotificationsScreen() {
           data={notifications}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderNotification}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           refreshing={loading}
           onRefresh={() => refreshNotifications()}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="notifications-off-outline" size={48} color={COLORS.textMuted} />
-              <Text style={styles.emptyText}>No notifications</Text>
-            </View>
-          }
+          ListEmptyComponent={(
+            <EmptyState
+              title="No notifications"
+              description="Routine activity, payment, complaint, and community updates will appear here."
+              icon={<Ionicons name="notifications-off-outline" size={32} color={COLORS.textMuted} />}
+            />
+          )}
         />
       )}
     </SafeAreaView>
@@ -117,70 +116,78 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.feedBg },
-  header: {
-    backgroundColor: COLORS.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    ...SHADOWS.header,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.feedBg,
   },
-  headerTitle: { fontSize: FONTS.sizes.xl, fontWeight: '800', color: '#FFF' },
-  headerSubtitle: { fontSize: FONTS.sizes.xs, color: 'rgba(255,255,255,0.7)', marginTop: 2, maxWidth: 220 },
-  unreadLabel: { fontSize: FONTS.sizes.xs, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
-  markAllBtn: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.pill,
-  },
-  markAllText: { color: '#FFF', fontSize: FONTS.sizes.xs, fontWeight: '600' },
-  loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  listContent: { padding: SPACING.lg, paddingBottom: SPACING.xxxl },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: COLORS.bgCard,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
-    ...SHADOWS.card,
-    position: 'relative',
-  },
-  cardRead: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  cardUnread: { borderLeftWidth: 3, borderLeftColor: COLORS.primary },
-  unreadDot: {
-    position: 'absolute',
-    top: SPACING.md,
-    right: SPACING.md,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.primary,
-  },
-  iconWrap: {
-    width: 44,
-    height: 44,
+  headerAction: {
+    minWidth: 72,
+    height: 36,
     borderRadius: RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
+    backgroundColor: COLORS.whiteOverlay,
   },
-  info: { flex: 1 },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  typeTag: { fontSize: FONTS.sizes.xs, fontWeight: '700', color: COLORS.primary },
-  typeTagRead: { color: COLORS.textMuted },
-  time: { fontSize: FONTS.sizes.xs, color: COLORS.textMuted },
-  title: { fontSize: FONTS.sizes.md, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 4 },
-  titleRead: { color: COLORS.textSecondary },
-  message: { fontSize: FONTS.sizes.sm, color: COLORS.textSecondary, lineHeight: 20 },
-  messageRead: { color: COLORS.textMuted },
-  empty: { alignItems: 'center', paddingVertical: SPACING.xxxl * 2 },
-  emptyText: { marginTop: SPACING.md, fontSize: FONTS.sizes.md, color: COLORS.textSecondary },
+  headerActionText: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textLight,
+    fontWeight: FONTS.weights.bold,
+  },
+  loader: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
+    padding: SPACING.md,
+    paddingBottom: SPACING.xl,
+  },
+  card: {
+    marginBottom: SPACING.xs,
+  },
+  cardUnread: {
+    borderColor: COLORS.primary,
+  },
+  pressable: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: SPACING.sm,
+  },
+  iconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.xs,
+  },
+  info: {
+    flex: 1,
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  type: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.primary,
+    fontWeight: FONTS.weights.bold,
+  },
+  time: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textMuted,
+  },
+  title: {
+    fontSize: FONTS.sizes.md,
+    color: COLORS.textPrimary,
+    fontWeight: FONTS.weights.semibold,
+  },
+  message: {
+    marginTop: 4,
+    fontSize: FONTS.sizes.sm,
+    color: COLORS.textSecondary,
+    lineHeight: 22,
+  },
 });

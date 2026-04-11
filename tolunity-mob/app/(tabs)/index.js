@@ -1,31 +1,29 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
   StatusBar,
+  StyleSheet,
+  Text,
   TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import FeedScreen from '../../src/screens/FeedScreen';
 import { useAuth } from '../../src/context/AuthContext';
 import { useNotifications } from '../../src/context/NotificationContext';
-import FeedScreen from '../../src/screens/FeedScreen';
-import { COLORS, FONTS, SPACING, SHADOWS } from '../../src/styles/theme';
+import { COLORS, FONTS, RADIUS, SPACING } from '../../src/styles/theme';
 
 export default function HomeTab() {
   const { isAuthenticated, isLoading } = useAuth();
   const { unreadCount } = useNotifications();
   const router = useRouter();
 
-  // If not authenticated, redirect is handled by root layout
-  // This keeps the component clean
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace('/login');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isAuthenticated, isLoading, router]);
 
   if (isLoading || !isAuthenticated) {
     return null;
@@ -35,51 +33,44 @@ export default function HomeTab() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
 
-      {/* App Header */}
       <View style={styles.header}>
-        {/* Logo + Subtitle */}
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerLogo}>TolUnity</Text>
-          <Text style={styles.headerSubtitle}>Community Feed</Text>
+        <View style={styles.headerCopy}>
+          <Text style={styles.brand}>TolUnity</Text>
+          <Text style={styles.subtitle}>Community feed</Text>
         </View>
-
-        {/* Right actions: Bell with badge + Flag */}
-        <View style={styles.headerRight}>
+        <View style={styles.headerActions}>
           <TouchableOpacity
-            style={styles.iconBtn}
+            style={styles.iconButton}
             onPress={() => router.push('/(tabs)/notifications')}
             activeOpacity={0.8}
           >
-            <Ionicons name="notifications" size={22} color="#FFF" />
-            {unreadCount > 0 && (
-              <View style={styles.notifBadge}>
-                <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            <Ionicons name="notifications-outline" size={20} color={COLORS.textLight} />
+            {unreadCount > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
               </View>
-            )}
+            ) : null}
           </TouchableOpacity>
-
           <TouchableOpacity
-            style={[styles.iconBtn, { marginLeft: SPACING.sm }]}
+            style={styles.iconButton}
             onPress={() => router.push('/(tabs)/complaints')}
             activeOpacity={0.8}
           >
-            <Ionicons name="flag" size={22} color="#FFF" />
+            <Ionicons name="flag-outline" size={20} color={COLORS.textLight} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Feed */}
-      <View style={styles.feedContainer}>
+      <View style={styles.feed}>
         <FeedScreen />
       </View>
 
-      {/* FAB - Create Post */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => router.push('/create-post')}
         activeOpacity={0.85}
       >
-        <Ionicons name="add" size={28} color="#FFF" />
+        <Ionicons name="add" size={20} color={COLORS.textLight} />
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -90,77 +81,71 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.feedBg,
   },
-  headerSafe: {
-    backgroundColor: COLORS.primary,
-  },
   header: {
-    backgroundColor: COLORS.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    ...SHADOWS.header,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.primary,
   },
-  headerLeft: {
+  headerCopy: {
     flex: 1,
   },
-  headerLogo: {
+  brand: {
     fontSize: FONTS.sizes.xl,
-    fontWeight: '900',
-    color: '#FFF',
-    letterSpacing: -0.5,
+    fontWeight: FONTS.weights.heavy,
+    color: COLORS.textLight,
   },
-  headerSubtitle: {
+  subtitle: {
+    marginTop: 2,
     fontSize: FONTS.sizes.xs,
-    color: 'rgba(255,255,255,0.75)',
-    marginTop: 1,
-    fontWeight: '500',
+    color: COLORS.whiteMuted,
   },
-  headerRight: {
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: SPACING.xs,
   },
-  iconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
+    backgroundColor: COLORS.whiteOverlay,
   },
-  notifBadge: {
+  badge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#FF3B30',
+    top: 2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.error,
   },
-  notifBadgeText: {
-    color: '#FFF',
-    fontSize: 9,
-    fontWeight: '800',
+  badgeText: {
+    fontSize: 10,
+    color: COLORS.textLight,
+    fontWeight: FONTS.weights.bold,
   },
-  feedContainer: {
+  feed: {
     flex: 1,
   },
   fab: {
     position: 'absolute',
-    right: SPACING.xl,
-    bottom: SPACING.xxl,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primary,
+    right: SPACING.md,
+    bottom: SPACING.md,
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.button,
+    backgroundColor: COLORS.primary,
+    borderWidth: 1,
+    borderColor: COLORS.primaryDark,
   },
 });

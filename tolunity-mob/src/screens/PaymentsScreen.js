@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import ScreenHeader from '../components/ScreenHeader';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import { API_BASE_URL } from '../utils/constants';
 import { getOwners, selectOwner, getMyTenants, removeTenant, hasOwner } from '../api/userApi';
@@ -105,7 +106,6 @@ function BreakdownCard({ title, payments, selectedPaymentId, onSelectPayment, em
   return (
     <Card>
       <View style={styles.sectionHeaderRow}>
-        <Ionicons name="receipt-outline" size={18} color={COLORS.accent} />
         <Text style={styles.sectionHeaderText}>{title}</Text>
       </View>
       {payments.length ? payments.map((item, index) => {
@@ -155,7 +155,6 @@ function PaymentMethodButton({ gateway, loading, active, disabled, onPress }) {
         <ActivityIndicator color={successStyle ? '#FFF' : COLORS.primary} />
       ) : (
         <>
-          <Ionicons name={config.icon} size={18} color={successStyle ? '#FFF' : COLORS.textPrimary} />
           <Text style={[styles.methodButtonText, successStyle ? styles.methodButtonTextSuccess : styles.methodButtonTextOutline]}>
             {config.label}
           </Text>
@@ -172,7 +171,6 @@ function CheckoutCard({ selectedPayment, gatewayConfig, loading, processingGatew
   return (
     <Card>
       <View style={styles.sectionHeaderRow}>
-        <Ionicons name="card-outline" size={18} color={COLORS.info} />
         <Text style={styles.sectionHeaderText}>Select Payment Method</Text>
       </View>
       {selectedPayment ? (
@@ -378,7 +376,6 @@ function CharityContributionCard({ description = 'Support the community charity 
     <>
       <Card style={styles.charityCard}>
         <View style={styles.sectionHeaderRow}>
-          <Ionicons name="heart-outline" size={18} color="#C2416C" />
           <Text style={styles.sectionHeaderText}>Charity Fund</Text>
         </View>
         <Text style={styles.meta}>{description}</Text>
@@ -396,7 +393,6 @@ function CharityContributionCard({ description = 'Support the community charity 
           Donate through eSewa so the contribution is verified before it enters the charity ledger.
         </Text>
         <TouchableOpacity style={styles.charityBtn} onPress={() => setVisible(true)}>
-          <Ionicons name="heart" size={16} color="#FFF" />
           <Text style={styles.charityBtnText}>Donate with eSewa</Text>
         </TouchableOpacity>
       </Card>
@@ -799,82 +795,76 @@ export default function PaymentsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-      <View style={styles.header}>
-        <Text style={styles.brandTitle}>TolUnity</Text>
-        <Text style={styles.headerTitle}>Payments</Text>
-      </View>
+      <ScreenHeader title="Payments" subtitle="Billing, checkout, and charity contributions" />
       {user?.userType === 'SECURITY' ? <SecurityPayments /> : user?.userType === 'OWNER' ? <OwnerPayments /> : <TenantPayments />}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F6FB' },
-  header: { backgroundColor: '#173E96', paddingHorizontal: SPACING.lg, paddingTop: SPACING.lg, paddingBottom: SPACING.xl, ...SHADOWS.header },
-  brandTitle: { color: '#FFF', fontSize: FONTS.sizes.xxl, fontWeight: '900' },
-  headerTitle: { color: 'rgba(255,255,255,0.88)', fontSize: FONTS.sizes.sm, fontWeight: '700', marginTop: 2 },
-  content: { padding: SPACING.lg, paddingBottom: SPACING.xxxl },
-  loader: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F6FB' },
-  heroCard: { backgroundColor: '#2148A0', borderRadius: 24, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.xxl, marginBottom: SPACING.lg, ...SHADOWS.card },
-  heroLabel: { color: 'rgba(255,255,255,0.86)', fontSize: FONTS.sizes.md, fontWeight: '700' },
-  heroAmount: { color: '#FFF', fontSize: 30, fontWeight: '900', marginTop: SPACING.md },
-  heroMeta: { color: 'rgba(255,255,255,0.82)', marginTop: SPACING.md, fontWeight: '600' },
-  heroHint: { color: 'rgba(255,255,255,0.76)', marginTop: SPACING.sm, lineHeight: 19 },
-  summaryStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md, marginBottom: SPACING.lg },
-  summaryTile: { flexGrow: 1, flexBasis: '30%', backgroundColor: '#FFF', borderRadius: 18, padding: SPACING.md, borderWidth: 1, borderColor: '#DFE7F4', ...SHADOWS.card },
-  summaryTileLabel: { color: COLORS.textMuted, fontSize: FONTS.sizes.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  summaryTileValue: { color: COLORS.textPrimary, fontSize: FONTS.sizes.lg, fontWeight: '900', marginTop: 8 },
-  card: { backgroundColor: '#FFF', borderRadius: 22, padding: SPACING.lg, marginBottom: SPACING.lg, borderWidth: 1, borderColor: '#E1E8F3', ...SHADOWS.card },
-  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.md },
+  container: { flex: 1, backgroundColor: COLORS.feedBg },
+  content: { padding: SPACING.md, paddingBottom: SPACING.xl },
+  loader: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.feedBg },
+  heroCard: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.sm, ...SHADOWS.card },
+  heroLabel: { color: COLORS.whiteMuted, fontSize: FONTS.sizes.sm, fontWeight: '700' },
+  heroAmount: { color: COLORS.textLight, fontSize: FONTS.sizes.xxl, fontWeight: '900', marginTop: SPACING.xs },
+  heroMeta: { color: COLORS.whiteMuted, marginTop: SPACING.xs, fontWeight: '600' },
+  heroHint: { color: COLORS.whiteMuted, marginTop: SPACING.xs, lineHeight: 20 },
+  summaryStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, marginBottom: SPACING.sm },
+  summaryTile: { flexGrow: 1, flexBasis: '30%', backgroundColor: COLORS.bgCard, borderRadius: RADIUS.md, padding: SPACING.sm, borderWidth: 1, borderColor: COLORS.cardBorder, ...SHADOWS.card },
+  summaryTileLabel: { color: COLORS.textMuted, fontSize: FONTS.sizes.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+  summaryTileValue: { color: COLORS.textPrimary, fontSize: FONTS.sizes.lg, fontWeight: '800', marginTop: 6 },
+  card: { backgroundColor: COLORS.bgCard, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.sm, borderWidth: 1, borderColor: COLORS.cardBorder, ...SHADOWS.card },
+  sectionHeaderRow: { marginBottom: SPACING.sm },
   sectionHeaderText: { fontSize: FONTS.sizes.lg, fontWeight: '800', color: COLORS.textPrimary },
   sectionTitle: { fontSize: FONTS.sizes.md, fontWeight: '800', color: COLORS.textPrimary, marginBottom: 6 },
   meta: { color: COLORS.textMuted, lineHeight: 18 },
-  breakdownRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: '#E4EAF5', borderRadius: RADIUS.md },
+  breakdownRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.cardBorder, borderRadius: RADIUS.md },
   breakdownRowLast: { borderBottomWidth: 0 },
-  breakdownRowSelected: { backgroundColor: '#F5F8FF', paddingHorizontal: SPACING.sm },
+  breakdownRowSelected: { backgroundColor: COLORS.surfaceBlue, paddingHorizontal: SPACING.xs },
   breakdownTextWrap: { flex: 1, paddingRight: SPACING.md },
   breakdownTitle: { fontSize: FONTS.sizes.md, fontWeight: '700', color: COLORS.textPrimary },
   breakdownMeta: { color: COLORS.textMuted, marginTop: 2 },
   breakdownAmount: { fontSize: FONTS.sizes.md, fontWeight: '800', color: COLORS.textPrimary },
-  breakdownDivider: { height: 2, backgroundColor: '#E4EAF5', marginTop: SPACING.md, marginBottom: SPACING.md },
+  breakdownDivider: { height: 1, backgroundColor: COLORS.cardBorder, marginTop: SPACING.sm, marginBottom: SPACING.sm },
   breakdownFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   breakdownFooterLabel: { fontSize: FONTS.sizes.lg, fontWeight: '800', color: COLORS.textPrimary },
-  breakdownFooterAmount: { fontSize: FONTS.sizes.xl, fontWeight: '900', color: '#3657CC' },
-  selectedBillBox: { backgroundColor: '#F7FAFF', borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.md, borderWidth: 1, borderColor: '#DEE7F7' },
+  breakdownFooterAmount: { fontSize: FONTS.sizes.xl, fontWeight: '900', color: COLORS.primary },
+  selectedBillBox: { backgroundColor: COLORS.surfaceBlue, borderRadius: RADIUS.md, padding: SPACING.sm, marginBottom: SPACING.sm, borderWidth: 1, borderColor: COLORS.cardBorder },
   selectedBillLabel: { color: COLORS.textMuted, fontSize: FONTS.sizes.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   selectedBillTitle: { color: COLORS.textPrimary, fontSize: FONTS.sizes.md, fontWeight: '800', marginTop: 4 },
   selectedBillMeta: { color: COLORS.textSecondary, marginTop: 2 },
-  methodButton: { height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm, marginBottom: SPACING.md },
-  methodButtonSuccess: { backgroundColor: '#19BC84' },
-  methodButtonOutline: { backgroundColor: '#FFF', borderWidth: 1.5, borderColor: '#CAD4E6' },
+  methodButton: { height: 48, borderRadius: RADIUS.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xs, marginBottom: SPACING.xs },
+  methodButtonSuccess: { backgroundColor: COLORS.success },
+  methodButtonOutline: { backgroundColor: COLORS.bgCard, borderWidth: 1, borderColor: COLORS.bgInputBorder },
   methodButtonDisabled: { opacity: 0.6 },
   methodButtonText: { fontWeight: '800', fontSize: FONTS.sizes.md },
   methodButtonTextSuccess: { color: '#FFF' },
   methodButtonTextOutline: { color: COLORS.textPrimary },
   gatewayHint: { color: COLORS.textMuted, lineHeight: 18 },
-  sessionBox: { marginTop: SPACING.md, backgroundColor: '#F5F8FF', borderRadius: RADIUS.lg, padding: SPACING.md },
+  sessionBox: { marginTop: SPACING.sm, backgroundColor: COLORS.surfaceBlue, borderRadius: RADIUS.md, padding: SPACING.sm },
   sessionTitle: { color: COLORS.textPrimary, fontWeight: '800' },
   sessionMeta: { color: COLORS.textMuted, marginTop: 4 },
   paymentCard: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.md },
-  paymentCardSelected: { borderWidth: 1.5, borderColor: '#B9CBFF' },
-  paymentIconWrap: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#F3F7FF', alignItems: 'center', justifyContent: 'center' },
+  paymentCardSelected: { borderWidth: 1, borderColor: COLORS.primary },
+  paymentIconWrap: { width: 42, height: 42, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceSoft, alignItems: 'center', justifyContent: 'center' },
   paymentBody: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', gap: SPACING.md },
   paymentMain: { flex: 1 },
   paymentSide: { alignItems: 'flex-end', minWidth: 102 },
   title: { fontSize: FONTS.sizes.md, fontWeight: '800', color: COLORS.textPrimary },
   amount: { fontWeight: '900', color: COLORS.textPrimary, marginBottom: 8 },
-  selectBtn: { borderRadius: RADIUS.pill, borderWidth: 1, borderColor: '#B7C6E2', paddingHorizontal: SPACING.md, paddingVertical: 6 },
+  selectBtn: { borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.bgInputBorder, paddingHorizontal: SPACING.sm, paddingVertical: 6 },
   selectBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   selectBtnText: { color: COLORS.primary, fontWeight: '800', fontSize: FONTS.sizes.xs },
   selectBtnTextActive: { color: '#FFF' },
   statusBadge: { borderRadius: RADIUS.pill, paddingHorizontal: SPACING.md, paddingVertical: 6 },
-  statusPending: { backgroundColor: '#FFF4D8' },
-  statusOverdue: { backgroundColor: '#FDE7E4' },
-  statusPaid: { backgroundColor: '#E6F7EE' },
+  statusPending: { backgroundColor: COLORS.surfaceWarning },
+  statusOverdue: { backgroundColor: COLORS.surfaceDanger },
+  statusPaid: { backgroundColor: COLORS.surfaceSuccess },
   statusText: { color: COLORS.textPrimary, fontWeight: '800', fontSize: FONTS.sizes.xs },
-  reportSummaryCard: { backgroundColor: '#F8FAFF', borderWidth: 1, borderColor: '#DCE6F7' },
-  reportSummaryRow: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.md },
-  reportSummaryPill: { flex: 1, backgroundColor: '#FFF', borderRadius: RADIUS.lg, padding: SPACING.md },
+  reportSummaryCard: { backgroundColor: COLORS.surfaceBlue, borderWidth: 1, borderColor: COLORS.cardBorder },
+  reportSummaryRow: { flexDirection: 'row', gap: SPACING.xs, marginTop: SPACING.sm },
+  reportSummaryPill: { flex: 1, backgroundColor: COLORS.bgCard, borderRadius: RADIUS.md, padding: SPACING.sm },
   reportSummaryLabel: { color: COLORS.textMuted, fontSize: FONTS.sizes.xs, fontWeight: '700', textTransform: 'uppercase' },
   reportSummaryValue: { color: COLORS.textPrimary, fontWeight: '900', fontSize: FONTS.sizes.lg, marginTop: 6 },
   reportHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACING.md },
@@ -884,27 +874,27 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   left: { flex: 1 },
   actionCol: { gap: SPACING.sm },
-  payBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.pill, paddingHorizontal: SPACING.md, paddingVertical: 6 },
+  payBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.pill, paddingHorizontal: SPACING.sm, paddingVertical: 6 },
   payBtnText: { color: '#FFF', fontWeight: '800', fontSize: FONTS.sizes.xs },
   linkRow: { borderTopWidth: 1, borderTopColor: COLORS.cardBorder, paddingTop: SPACING.md, marginTop: SPACING.md },
-  charityCard: { backgroundColor: '#FFF7FA', borderColor: '#F3D5DF' },
-  charityHighlights: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md, marginTop: SPACING.md, marginBottom: SPACING.lg },
-  charityHighlightPill: { flexGrow: 1, flexBasis: '40%', backgroundColor: '#FFF', borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: '#F0D7E1' },
+  charityCard: { backgroundColor: COLORS.surfaceDanger, borderColor: COLORS.cardBorder },
+  charityHighlights: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, marginTop: SPACING.sm, marginBottom: SPACING.sm },
+  charityHighlightPill: { flexGrow: 1, flexBasis: '40%', backgroundColor: COLORS.bgCard, borderRadius: RADIUS.md, padding: SPACING.sm, borderWidth: 1, borderColor: COLORS.cardBorder },
   charityHighlightLabel: { color: COLORS.textMuted, fontSize: FONTS.sizes.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
-  charityHighlightValue: { color: '#A3345D', fontWeight: '800', marginTop: 6 },
-  charityBtn: { backgroundColor: '#C2416C', borderRadius: RADIUS.lg, paddingVertical: SPACING.lg, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: SPACING.sm },
+  charityHighlightValue: { color: COLORS.likePink, fontWeight: '800', marginTop: 6 },
+  charityBtn: { backgroundColor: COLORS.likePink, borderRadius: RADIUS.md, paddingVertical: SPACING.sm, alignItems: 'center', justifyContent: 'center' },
   charityBtnText: { color: '#FFF', fontWeight: '800' },
   input: { backgroundColor: COLORS.bgInput, borderWidth: 1, borderColor: COLORS.bgInputBorder, borderRadius: RADIUS.md, padding: SPACING.md, marginBottom: SPACING.md, color: COLORS.textPrimary },
   textArea: { minHeight: 110, textAlignVertical: 'top' },
-  primaryBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: SPACING.lg, alignItems: 'center' },
+  primaryBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.md, paddingVertical: SPACING.sm, alignItems: 'center' },
   primaryBtnText: { color: '#FFF', fontWeight: '800' },
-  modalActionRow: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.sm },
-  primaryModalBtn: { flex: 1, backgroundColor: '#C2416C', borderRadius: RADIUS.lg, paddingVertical: SPACING.lg, alignItems: 'center', justifyContent: 'center' },
-  secondaryModalBtn: { flex: 1, borderWidth: 1, borderColor: '#D8C1CB', borderRadius: RADIUS.lg, paddingVertical: SPACING.lg, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' },
+  modalActionRow: { flexDirection: 'row', gap: SPACING.xs, marginTop: SPACING.xs },
+  primaryModalBtn: { flex: 1, backgroundColor: COLORS.likePink, borderRadius: RADIUS.md, paddingVertical: SPACING.sm, alignItems: 'center', justifyContent: 'center' },
+  secondaryModalBtn: { flex: 1, borderWidth: 1, borderColor: COLORS.bgInputBorder, borderRadius: RADIUS.md, paddingVertical: SPACING.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.bgCard },
   secondaryModalBtnText: { color: COLORS.textPrimary, fontWeight: '700' },
-  secondaryBtn: { borderWidth: 1, borderColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: SPACING.md, alignItems: 'center', marginTop: SPACING.md },
+  secondaryBtn: { borderWidth: 1, borderColor: COLORS.primary, borderRadius: RADIUS.md, paddingVertical: SPACING.xs, alignItems: 'center', marginTop: SPACING.sm },
   secondaryBtnText: { color: COLORS.primary, fontWeight: '800' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  modal: { backgroundColor: '#FFF', padding: SPACING.xxl, borderTopLeftRadius: RADIUS.xxl, borderTopRightRadius: RADIUS.xxl },
+  modalOverlay: { flex: 1, backgroundColor: COLORS.overlay, justifyContent: 'flex-end' },
+  modal: { backgroundColor: COLORS.bgCard, padding: SPACING.md, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl },
   modalTitle: { fontSize: FONTS.sizes.xl, fontWeight: '800', color: COLORS.textPrimary, marginBottom: SPACING.sm },
 });

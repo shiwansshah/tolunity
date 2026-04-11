@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import {
-  View,
-  TextInput,
-  Text,
-  TouchableOpacity,
   StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONTS, SPACING, RADIUS } from '../styles/theme';
+import { COLORS, FONTS, RADIUS, SPACING } from '../styles/theme';
 
 export default function InputField({
   label,
@@ -21,106 +21,120 @@ export default function InputField({
   error,
   rightElement,
   editable = true,
+  multiline = false,
+  numberOfLines,
+  inputStyle,
 }) {
-  const [isFocused, setIsFocused] = useState(false);
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-
-  const isSecure = secureTextEntry && !isPasswordVisible;
+  const [focused, setFocused] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const secure = secureTextEntry && !passwordVisible;
 
   return (
     <View style={styles.wrapper}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
-
       <View
         style={[
-          styles.container,
-          isFocused && styles.containerFocused,
-          error && styles.containerError,
+          styles.field,
+          focused && styles.fieldFocused,
+          error && styles.fieldError,
+          multiline && styles.fieldMultiline,
         ]}
       >
-        {iconName && (
+        {iconName ? (
           <Ionicons
             name={iconName}
             size={18}
-            color={isFocused ? COLORS.primary : COLORS.textMuted}
+            color={focused ? COLORS.primary : COLORS.textMuted}
             style={styles.icon}
           />
-        )}
-
+        ) : null}
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            multiline && styles.inputMultiline,
+            inputStyle,
+          ]}
           placeholder={placeholder}
           placeholderTextColor={COLORS.textMuted}
           value={value}
           onChangeText={onChangeText}
-          secureTextEntry={isSecure}
+          secureTextEntry={secure}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           editable={editable}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          multiline={multiline}
+          numberOfLines={numberOfLines}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
         />
-
-        {secureTextEntry && (
+        {secureTextEntry ? (
           <TouchableOpacity
-            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+            onPress={() => setPasswordVisible((current) => !current)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons
-              name={isPasswordVisible ? 'eye-outline' : 'eye-off-outline'}
+              name={passwordVisible ? 'eye-outline' : 'eye-off-outline'}
               size={18}
               color={COLORS.textMuted}
             />
           </TouchableOpacity>
-        )}
-
-        {rightElement && !secureTextEntry && rightElement}
+        ) : rightElement || null}
       </View>
-
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.sm,
   },
   label: {
+    marginBottom: SPACING.xs,
     fontSize: FONTS.sizes.sm,
-    fontWeight: '700',
+    fontWeight: FONTS.weights.semibold,
     color: COLORS.textPrimary,
-    marginBottom: 6,
   },
-  container: {
+  field: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: SPACING.sm,
     backgroundColor: COLORS.bgInput,
-    borderWidth: 1.2,
+    borderWidth: 1,
     borderColor: COLORS.bgInputBorder,
-    borderRadius: 16,
-    paddingHorizontal: SPACING.md,
-    minHeight: 54,
+    borderRadius: RADIUS.md,
   },
-  containerFocused: {
+  fieldFocused: {
     borderColor: COLORS.primary,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.bgCard,
   },
-  containerError: {
+  fieldError: {
     borderColor: COLORS.error,
   },
+  fieldMultiline: {
+    minHeight: 112,
+    alignItems: 'flex-start',
+    paddingVertical: SPACING.sm,
+  },
   icon: {
-    marginRight: SPACING.sm,
+    marginRight: SPACING.xs,
+    marginTop: 1,
   },
   input: {
     flex: 1,
+    minHeight: 48,
     fontSize: FONTS.sizes.md,
     color: COLORS.textPrimary,
-    height: '100%',
   },
-  errorText: {
+  inputMultiline: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  error: {
+    marginTop: SPACING.xs,
     fontSize: FONTS.sizes.xs,
     color: COLORS.error,
-    marginTop: SPACING.xs,
+    lineHeight: 18,
   },
 });

@@ -1,23 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  FlatList,
-  TextInput,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
+  FlatList,
   Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getPostComments, createComment } from '../api/feedApi';
+import { createComment, getPostComments } from '../api/feedApi';
 import { useNotifications } from '../context/NotificationContext';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { COLORS, FONTS, RADIUS, SPACING } from '../styles/theme';
+import EmptyState from './EmptyState';
 
-export default function CommentsModal({ visible, postId, onClose, onCommentAdded }) {
+export default function CommentsModal({
+  visible,
+  postId,
+  onClose,
+  onCommentAdded,
+}) {
   const { refreshNotifications } = useNotifications();
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -33,8 +39,8 @@ export default function CommentsModal({ visible, postId, onClose, onCommentAdded
   const loadComments = async () => {
     setLoading(true);
     try {
-      const res = await getPostComments(postId);
-      setComments(res.data);
+      const response = await getPostComments(postId);
+      setComments(response.data);
     } catch (error) {
       console.error('Load comments error:', error);
     } finally {
@@ -43,7 +49,9 @@ export default function CommentsModal({ visible, postId, onClose, onCommentAdded
   };
 
   const handleSubmit = async () => {
-    if (!newComment.trim()) return;
+    if (!newComment.trim()) {
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -51,7 +59,7 @@ export default function CommentsModal({ visible, postId, onClose, onCommentAdded
       setNewComment('');
       await loadComments();
       await refreshNotifications({ silent: true });
-      if (onCommentAdded) onCommentAdded();
+      onCommentAdded?.();
     } catch (error) {
       console.error('Create comment error:', error);
     } finally {
@@ -68,7 +76,7 @@ export default function CommentsModal({ visible, postId, onClose, onCommentAdded
           <Text style={styles.avatarText}>{item.username?.[0]?.toUpperCase()}</Text>
         </View>
       )}
-      <View style={styles.commentContent}>
+      <View style={styles.commentBody}>
         <View style={styles.commentHeader}>
           <Text style={styles.username}>{item.username}</Text>
           <Text style={styles.time}>
@@ -81,27 +89,23 @@ export default function CommentsModal({ visible, postId, onClose, onCommentAdded
   );
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.overlay}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalContent}
+          style={styles.sheet}
         >
+          <View style={styles.handle} />
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Comments</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+            <Text style={styles.title}>Comments</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={20} color={COLORS.textPrimary} />
             </TouchableOpacity>
           </View>
 
           {loading ? (
             <View style={styles.loader}>
-              <ActivityIndicator color={COLORS.primary} size="large" />
+              <ActivityIndicator size="large" color={COLORS.primary} />
             </View>
           ) : (
             <FlatList
@@ -109,18 +113,20 @@ export default function CommentsModal({ visible, postId, onClose, onCommentAdded
               keyExtractor={(item) => item.commentId.toString()}
               renderItem={renderComment}
               contentContainerStyle={styles.listContent}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No comments yet. Be the first!</Text>
-                </View>
-              }
+              ListEmptyComponent={(
+                <EmptyState
+                  title="No comments yet"
+                  description="Be the first to respond to this post."
+                />
+              )}
             />
           )}
 
-          <View style={styles.inputContainer}>
+          <View style={styles.composer}>
             <TextInput
               style={styles.input}
-              placeholder="Add a comment..."
+              placeholder="Add a comment"
+              placeholderTextColor={COLORS.textMuted}
               value={newComment}
               onChangeText={setNewComment}
               multiline
@@ -128,12 +134,12 @@ export default function CommentsModal({ visible, postId, onClose, onCommentAdded
             <TouchableOpacity
               onPress={handleSubmit}
               disabled={submitting || !newComment.trim()}
-              style={[styles.sendBtn, !newComment.trim() && styles.disabledBtn]}
+              style={[styles.sendButton, !newComment.trim() && styles.sendButtonDisabled]}
             >
               {submitting ? (
-                <ActivityIndicator size="small" color="#FFF" />
+                <ActivityIndicator size="small" color={COLORS.textLight} />
               ) : (
-                <Ionicons name="send" size={20} color="#FFF" />
+                <Ionicons name="send" size={18} color={COLORS.textLight} />
               )}
             </TouchableOpacity>
           </View>
@@ -144,32 +150,44 @@ export default function CommentsModal({ visible, postId, onClose, onCommentAdded
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
+    backgroundColor: COLORS.overlay,
   },
-  modalContent: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: RADIUS.xxl,
-    borderTopRightRadius: RADIUS.xxl,
-    height: '80%',
+  sheet: {
+    height: '82%',
+    backgroundColor: COLORS.bgCard,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.cardBorder,
+    alignSelf: 'center',
+    marginTop: SPACING.xs,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.cardBorder,
   },
-  headerTitle: {
+  title: {
     fontSize: FONTS.sizes.lg,
-    fontWeight: '700',
+    fontWeight: FONTS.weights.bold,
     color: COLORS.textPrimary,
   },
-  closeBtn: {
-    padding: SPACING.xs,
+  closeButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loader: {
     flex: 1,
@@ -177,12 +195,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   listContent: {
-    padding: SPACING.lg,
-    paddingBottom: SPACING.xxxl,
+    padding: SPACING.md,
+    paddingBottom: SPACING.xl,
   },
   commentItem: {
     flexDirection: 'row',
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.sm,
   },
   avatar: {
     width: 36,
@@ -198,22 +216,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: {
-    color: '#FFF',
-    fontWeight: '700',
+    color: COLORS.textLight,
+    fontSize: FONTS.sizes.sm,
+    fontWeight: FONTS.weights.bold,
   },
-  commentContent: {
+  commentBody: {
     flex: 1,
-    marginLeft: SPACING.md,
+    marginLeft: SPACING.xs,
+    paddingBottom: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
   },
   commentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
   },
   username: {
-    fontWeight: '700',
     fontSize: FONTS.sizes.sm,
+    fontWeight: FONTS.weights.semibold,
     color: COLORS.textPrimary,
   },
   time: {
@@ -221,46 +242,43 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   commentText: {
+    marginTop: 4,
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
-    lineHeight: 20,
+    lineHeight: 22,
   },
-  inputContainer: {
+  composer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.lg,
+    alignItems: 'flex-end',
+    padding: SPACING.md,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
-    backgroundColor: '#FFF',
-    paddingBottom: Platform.OS === 'ios' ? SPACING.xl : SPACING.lg,
+    backgroundColor: COLORS.bgCard,
   },
   input: {
     flex: 1,
-    backgroundColor: COLORS.feedBg,
-    borderRadius: RADIUS.xl,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    maxHeight: 100,
-    fontSize: FONTS.sizes.sm,
+    minHeight: 48,
+    maxHeight: 112,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.bgInputBorder,
+    backgroundColor: COLORS.bgInput,
+    fontSize: FONTS.sizes.md,
+    color: COLORS.textPrimary,
+    textAlignVertical: 'top',
   },
-  sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  sendButton: {
+    width: 48,
+    height: 48,
+    marginLeft: SPACING.xs,
+    borderRadius: RADIUS.md,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: SPACING.md,
   },
-  disabledBtn: {
+  sendButtonDisabled: {
     backgroundColor: COLORS.textMuted,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    marginTop: 50,
-  },
-  emptyText: {
-    color: COLORS.textMuted,
-    fontSize: FONTS.sizes.sm,
   },
 });

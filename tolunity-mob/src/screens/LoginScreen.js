@@ -1,32 +1,31 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Alert,
-  StatusBar,
+  Image,
   KeyboardAvoidingView,
   Platform,
-  Image,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../context/AuthContext';
-import { loginUser } from '../api/authApi';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { getApiErrorMessage } from '../api/apiError';
-import InputField from '../components/InputField';
+import { loginUser } from '../api/authApi';
 import Button from '../components/Button';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import Container from '../components/Container';
+import InputField from '../components/InputField';
+import SurfaceCard from '../components/SurfaceCard';
+import { useAuth } from '../context/AuthContext';
+import { COLORS, FONTS, RADIUS, SPACING, TYPOGRAPHY } from '../styles/theme';
 
 const logoImage = require('../../assets/images/logo.png');
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -72,29 +71,28 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.flex} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.bgLight} translucent={false} />
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.logoSection}>
-            <View style={styles.logoBadge}>
-              <Image source={logoImage} style={styles.logoImage} resizeMode="contain" />
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Container scroll contentStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <View style={styles.brandBlock}>
+            <View style={styles.logoWrap}>
+              <Image source={logoImage} style={styles.logo} resizeMode="contain" />
             </View>
-            <Text style={styles.logoText}>TolUnity</Text>
-            <Text style={styles.tagline}>Community management, billing, visitors, and alerts in one place.</Text>
+            <Text style={styles.brandName}>TolUnity</Text>
+            <Text style={styles.brandCopy}>
+              Community management, billing, visitors, and alerts in one place.
+            </Text>
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardEyebrow}>Sign in</Text>
-            <Text style={styles.cardTitle}>Welcome Back</Text>
-            <Text style={styles.cardSubtitle}>Use your account to continue into the community workspace.</Text>
+          <SurfaceCard style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={TYPOGRAPHY.eyebrow}>Sign In</Text>
+              <Text style={styles.cardTitle}>Welcome back</Text>
+              <Text style={styles.cardSubtitle}>
+                Use your account details to continue into the community workspace.
+              </Text>
+            </View>
 
             <InputField
               label="Username"
@@ -103,14 +101,12 @@ export default function LoginScreen() {
               onChangeText={(value) => {
                 setEmail(value);
                 if (errors.email) {
-                  setErrors((currentErrors) => ({ ...currentErrors, email: null }));
+                  setErrors((current) => ({ ...current, email: null }));
                 }
               }}
-              iconName="person-outline"
               keyboardType="email-address"
               error={errors.email}
             />
-
             <InputField
               label="Password"
               placeholder="Enter your password"
@@ -118,159 +114,123 @@ export default function LoginScreen() {
               onChangeText={(value) => {
                 setPassword(value);
                 if (errors.password) {
-                  setErrors((currentErrors) => ({ ...currentErrors, password: null }));
+                  setErrors((current) => ({ ...current, password: null }));
                 }
               }}
-              iconName="lock-closed-outline"
               secureTextEntry
               error={errors.password}
             />
 
-            <View style={styles.rowBetween}>
+            <View style={styles.row}>
               <TouchableOpacity
-                style={styles.checkRow}
-                onPress={() => setRememberMe((currentValue) => !currentValue)}
+                style={styles.rememberRow}
+                onPress={() => setRememberMe((current) => !current)}
                 activeOpacity={0.7}
               >
-                <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
-                  {rememberMe && <Ionicons name="checkmark" size={11} color="#FFF" />}
-                </View>
+                <View style={[styles.checkbox, rememberMe && styles.checkboxActive]} />
                 <Text style={styles.rememberText}>Remember me</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/forgot-password')}>
-                <Text style={styles.forgotText}>Forgot password?</Text>
+              <TouchableOpacity onPress={() => router.push('/forgot-password')} activeOpacity={0.7}>
+                <Text style={styles.linkText}>Forgot password?</Text>
               </TouchableOpacity>
             </View>
 
-            <Button
-              title="Sign In"
-              onPress={handleLogin}
-              loading={loading}
-              iconName="arrow-forward"
-              iconPosition="left"
-              style={styles.signInBtn}
-            />
+            <Button title="Sign In" onPress={handleLogin} loading={loading} />
 
-            <View style={styles.orRow}>
-              <View style={styles.orLine} />
-              <Text style={styles.orText}>or</Text>
-              <View style={styles.orLine} />
-            </View>
-
-            <View style={styles.registerRow}>
-              <Text style={styles.registerText}>Owner or tenant without an account? </Text>
-              <TouchableOpacity onPress={() => router.push('/register')}>
-                <Text style={styles.registerLink}>Register here</Text>
+            <View style={styles.footerRow}>
+              <Text style={styles.footerText}>Owner or tenant without an account?</Text>
+              <TouchableOpacity onPress={() => router.push('/register')} activeOpacity={0.7}>
+                <Text style={styles.linkText}>Register here</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </ScrollView>
+          </SurfaceCard>
+        </Container>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: {
+  container: {
     flex: 1,
     backgroundColor: COLORS.bgLight,
   },
-  container: {
+  flex: {
+    flex: 1,
+  },
+  content: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.xxxl,
+    paddingVertical: SPACING.xl,
   },
-  logoSection: {
+  brandBlock: {
     alignItems: 'center',
-    marginBottom: SPACING.xxxl,
+    marginBottom: SPACING.md,
   },
-  logoBadge: {
-    width: 92,
-    height: 92,
-    borderRadius: 28,
-    backgroundColor: '#FFFFFF',
+  logoWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
+    backgroundColor: COLORS.bgCard,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.lg,
-    ...SHADOWS.card,
+    marginBottom: SPACING.sm,
   },
-  logoImage: {
-    width: 62,
-    height: 62,
+  logo: {
+    width: 56,
+    height: 56,
   },
-  logoText: {
-    fontSize: 38,
-    fontWeight: '900',
+  brandName: {
+    fontSize: FONTS.sizes.xxl,
+    fontWeight: FONTS.weights.heavy,
     color: COLORS.primary,
-    letterSpacing: -1,
   },
-  tagline: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textSecondary,
+  brandCopy: {
     marginTop: SPACING.xs,
-    letterSpacing: 0.1,
+    maxWidth: 320,
+    fontSize: FONTS.sizes.sm,
+    lineHeight: 22,
+    color: COLORS.textSecondary,
     textAlign: 'center',
-    lineHeight: 19,
-    maxWidth: 280,
   },
   card: {
-    backgroundColor: COLORS.bgCard,
-    borderRadius: RADIUS.xxl,
-    padding: SPACING.xxl,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    ...SHADOWS.card,
+    padding: SPACING.md,
   },
-  cardEyebrow: {
-    alignSelf: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 6,
-    borderRadius: RADIUS.pill,
-    backgroundColor: '#ECF1F7',
-    color: COLORS.primary,
-    fontSize: FONTS.sizes.xs,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+  cardHeader: {
     marginBottom: SPACING.md,
   },
   cardTitle: {
-    fontSize: FONTS.sizes.xxl,
-    fontWeight: '800',
+    marginTop: SPACING.xs,
+    fontSize: FONTS.sizes.xl,
+    fontWeight: FONTS.weights.heavy,
     color: COLORS.textPrimary,
-    textAlign: 'center',
-    marginBottom: SPACING.xs,
   },
   cardSubtitle: {
+    marginTop: SPACING.xs,
     fontSize: FONTS.sizes.sm,
+    lineHeight: 22,
     color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: SPACING.xxl,
-    lineHeight: 20,
   },
-  rowBetween: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.xxl,
+    marginBottom: SPACING.sm,
   },
-  checkRow: {
+  rememberRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   checkbox: {
-    width: 18,
-    height: 18,
-    borderWidth: 1.5,
-    borderColor: COLORS.bgInputBorder,
+    width: 16,
+    height: 16,
     borderRadius: 4,
-    marginRight: SPACING.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.bgInputBorder,
+    marginRight: SPACING.xs,
+    backgroundColor: COLORS.bgCard,
   },
   checkboxActive: {
     backgroundColor: COLORS.primary,
@@ -280,41 +240,21 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
   },
-  forgotText: {
+  linkText: {
     fontSize: FONTS.sizes.sm,
     color: COLORS.primary,
-    fontWeight: '600',
+    fontWeight: FONTS.weights.semibold,
   },
-  signInBtn: {
-    width: '100%',
-  },
-  orRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: SPACING.lg,
-  },
-  orLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.cardBorder,
-  },
-  orText: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textMuted,
-    marginHorizontal: SPACING.md,
-  },
-  registerRow: {
+  footerRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: SPACING.sm,
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
   },
-  registerText: {
+  footerText: {
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
-  },
-  registerLink: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.primary,
-    fontWeight: '700',
   },
 });

@@ -1,56 +1,64 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-  Share,
   Alert,
+  Image,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
-import { toggleLike, deletePost } from '../api/feedApi';
+import { deletePost, toggleLike } from '../api/feedApi';
 import { useNotifications } from '../context/NotificationContext';
+import { COLORS, FONTS, RADIUS, SPACING } from '../styles/theme';
 import CommentsModal from './CommentsModal';
 
-/**
- * Premium PostCard component matching the UI design
- * Shows: author avatar, name, time, content, likes, comments, share
- */
+const AVATAR_COLORS = [
+  COLORS.primary,
+  COLORS.secondary,
+  COLORS.accent,
+  COLORS.info,
+  COLORS.warning,
+  COLORS.success,
+];
+
 export default function PostCard({ post, reload, currentUser }) {
   const router = useRouter();
   const { refreshNotifications } = useNotifications();
   const [likeLoading, setLikeLoading] = React.useState(false);
-  const [isLiked, setIsLiked] = React.useState(post.likedByCurrentUser);
+  const [liked, setLiked] = React.useState(post.likedByCurrentUser);
   const [likesCount, setLikesCount] = React.useState(post.likesCount ?? 0);
   const [commentsCount, setCommentsCount] = React.useState(post.commentsCount ?? 0);
   const [showComments, setShowComments] = React.useState(false);
 
   const isMyPost = currentUser?.name === post.authorUsername;
+  const avatarColorIndex = post.authorUsername
+    ? post.authorUsername.charCodeAt(0) % AVATAR_COLORS.length
+    : 0;
 
   const handleLike = async () => {
-    if (likeLoading) return;
-    setLikeLoading(true);
+    if (likeLoading) {
+      return;
+    }
 
-    // Optimistic update
-    const wasLiked = isLiked;
-    setIsLiked(!wasLiked);
-    setLikesCount((prev) => (wasLiked ? prev - 1 : prev + 1));
+    const previousLiked = liked;
+    setLikeLoading(true);
+    setLiked(!previousLiked);
+    setLikesCount((current) => (previousLiked ? current - 1 : current + 1));
 
     try {
-      const res = await toggleLike(post.postId);
-      if (res.data?.likesCount !== undefined) {
-        setLikesCount(res.data.likesCount);
-        setIsLiked(res.data.liked);
+      const response = await toggleLike(post.postId);
+      if (response.data?.likesCount !== undefined) {
+        setLikesCount(response.data.likesCount);
+        setLiked(response.data.liked);
       }
       await refreshNotifications({ silent: true });
     } catch (error) {
-      // Revert on error
-      setIsLiked(wasLiked);
-      setLikesCount((prev) => (wasLiked ? prev + 1 : prev - 1));
+      setLiked(previousLiked);
+      setLikesCount((current) => (previousLiked ? current + 1 : current - 1));
       console.error('Like error:', error);
     } finally {
       setLikeLoading(false);
@@ -60,7 +68,7 @@ export default function PostCard({ post, reload, currentUser }) {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `${post.authorUsername}: ${post.content || 'Check out this post!'}`,
+        message: `${post.authorUsername}: ${post.content || 'Check out this post.'}`,
         title: 'TolUnity Community Post',
       });
     } catch (error) {
@@ -68,44 +76,46 @@ export default function PostCard({ post, reload, currentUser }) {
     }
   };
 
-  const showOptions = () => {
-    Alert.alert('Post Options', 'What would you like to do?', [
-      { text: 'Cancel', style: 'cancel' },
-      { 
-        text: 'Edit Post', 
-        onPress: () => {
-          setTimeout(() => {
-            router.push({ 
-              pathname: '/edit-post', 
-              params: { 
-                postId: post.postId, 
-                content: post.content || '',
-                medias: post.medias ? JSON.stringify(post.medias) : '[]'
-              } 
-            });
-          }, 150);
-        }
-      },
-      { text: 'Delete', style: 'destructive', onPress: confirmDelete },
-    ]);
-  };
-
-  const confirmDelete = () => {
-    setTimeout(() => {
-      Alert.alert('Delete Post?', 'Are you sure you want to delete this post? This cannot be undone.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Yes, Delete', style: 'destructive', onPress: executeDelete },
-      ]);
-    }, 150);
-  };
-
   const executeDelete = async () => {
     try {
       await deletePost(post.postId);
-      if (reload) reload();
+      reload?.();
     } catch (error) {
       Alert.alert('Error', 'Failed to delete the post.');
     }
+  };
+
+  const showOptions = () => {
+    Alert.alert('Post Options', 'What would you like to do?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Edit Post',
+        onPress: () => {
+          setTimeout(() => {
+            router.push({
+              pathname: '/edit-post',
+              params: {
+                postId: post.postId,
+                content: post.content || '',
+                medias: post.medias ? JSON.stringify(post.medias) : '[]',
+              },
+            });
+          }, 150);
+        },
+      },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          setTimeout(() => {
+            Alert.alert('Delete Post?', 'Are you sure you want to delete this post? This cannot be undone.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: executeDelete },
+            ]);
+          }, 150);
+        },
+      },
+    ]);
   };
 
   const formatTime = (dateString) => {
@@ -113,148 +123,91 @@ export default function PostCard({ post, reload, currentUser }) {
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now - date;
-    const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffHrs < 1) return 'Just now';
-    if (diffHrs < 24) return `${diffHrs} hour${diffHrs > 1 ? 's' : ''} ago`;
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
-    
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${months[date.getMonth()]} ${date.getDate()}`;
+
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
 
   const getInitials = (name) => {
     if (!name) return '?';
     return name
       .split(' ')
-      .map((n) => n[0])
+      .map((part) => part[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
   };
 
-  const avatarColors = [
-    '#1E3FA0', '#E91E8C', '#FF6B35', '#2ECC71', '#9B59B6', '#F39C12',
-  ];
-  const colorIndex = post.authorUsername
-    ? post.authorUsername.charCodeAt(0) % avatarColors.length
-    : 0;
-
   return (
     <View style={styles.card}>
-      {/* Author Row */}
-      <View style={styles.authorRow}>
-        {post.authorProfilePictureUrl ? (
-          <Image
-            source={{ uri: post.authorProfilePictureUrl }}
-            style={styles.avatar}
-          />
-        ) : (
-          <View
-            style={[
-              styles.avatarPlaceholder,
-              { backgroundColor: avatarColors[colorIndex] },
-            ]}
-          >
-            <Text style={styles.avatarInitials}>{getInitials(post.authorUsername)}</Text>
+      <View style={styles.header}>
+        <View style={styles.authorRow}>
+          {post.authorProfilePictureUrl ? (
+            <Image source={{ uri: post.authorProfilePictureUrl }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatarPlaceholder, { backgroundColor: AVATAR_COLORS[avatarColorIndex] }]}>
+              <Text style={styles.avatarText}>{getInitials(post.authorUsername)}</Text>
+            </View>
+          )}
+          <View style={styles.authorInfo}>
+            <Text style={styles.authorName}>{post.authorUsername || 'Unknown'}</Text>
+            <Text style={styles.postTime}>{formatTime(post.createdAt)}</Text>
           </View>
-        )}
-
-        <View style={styles.authorInfo}>
-          <Text style={styles.authorName}>{post.authorUsername || 'Unknown'}</Text>
-          <Text style={styles.postTime}>{formatTime(post.createdAt)}</Text>
         </View>
-
-        {isMyPost && (
-          <TouchableOpacity onPress={showOptions} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="ellipsis-horizontal" size={20} color={COLORS.textSecondary} />
+        {isMyPost ? (
+          <TouchableOpacity onPress={showOptions} style={styles.iconButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="ellipsis-horizontal" size={18} color={COLORS.textSecondary} />
           </TouchableOpacity>
-        )}
+        ) : null}
       </View>
 
-      {/* Post Content */}
-      {!!post.content && (
-        <Text style={styles.content}>{post.content}</Text>
-      )}
+      {post.content ? <Text style={styles.content}>{post.content}</Text> : null}
 
-      {/* Media */}
-      {post.medias && post.medias.length > 0 && (
-        <View style={styles.mediaContainer}>
-          {post.medias.map((m, i) => {
-            if (m.mediaType?.toUpperCase() === 'VIDEO') {
-              return (
-                <Video
-                  key={i}
-                  source={{ uri: m.mediaUrl }}
-                  style={styles.mediaVideo}
-                  useNativeControls
-                  resizeMode={ResizeMode.CONTAIN}
-                  isLooping
-                />
-              );
-            }
-            return (
+      {post.medias?.length ? (
+        <View style={styles.mediaStack}>
+          {post.medias.map((media, index) => (
+            media.mediaType?.toUpperCase() === 'VIDEO' ? (
+              <Video
+                key={`${media.mediaUrl}-${index}`}
+                source={{ uri: media.mediaUrl }}
+                style={styles.mediaVideo}
+                useNativeControls
+                resizeMode={ResizeMode.CONTAIN}
+                isLooping
+              />
+            ) : (
               <Image
-                key={i}
-                source={{ uri: m.mediaUrl }}
+                key={`${media.mediaUrl}-${index}`}
+                source={{ uri: media.mediaUrl }}
                 style={styles.mediaImage}
                 resizeMode="cover"
               />
-            );
-          })}
+            )
+          ))}
         </View>
-      )}
+      ) : null}
 
-      {/* Divider */}
-      <View style={styles.divider} />
-
-      {/* Actions Row */}
-      <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={handleLike}
-          activeOpacity={0.7}
-        >
+      <View style={styles.actions}>
+        <TouchableOpacity style={styles.actionButton} onPress={handleLike} activeOpacity={0.7}>
           <Ionicons
-            name={isLiked ? 'heart' : 'heart-outline'}
-            size={20}
-            color={isLiked ? COLORS.likePink : COLORS.textSecondary}
+            name={liked ? 'heart' : 'heart-outline'}
+            size={18}
+            color={liked ? COLORS.likePink : COLORS.textSecondary}
           />
-          <Text
-            style={[
-              styles.actionText,
-              isLiked && { color: COLORS.likePink },
-            ]}
-          >
-            {likesCount}
-          </Text>
+          <Text style={[styles.actionText, liked && styles.actionTextLiked]}>{likesCount}</Text>
         </TouchableOpacity>
- 
-        <TouchableOpacity 
-          style={styles.actionBtn} 
-          activeOpacity={0.7}
-          onPress={() => setShowComments(true)}
-        >
-          <Ionicons
-            name="chatbubble-outline"
-            size={19}
-            color={COLORS.textSecondary}
-          />
+        <TouchableOpacity style={styles.actionButton} onPress={() => setShowComments(true)} activeOpacity={0.7}>
+          <Ionicons name="chatbubble-outline" size={18} color={COLORS.textSecondary} />
           <Text style={styles.actionText}>{commentsCount}</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={handleShare}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name="share-social-outline"
-            size={20}
-            color={COLORS.textSecondary}
-          />
+        <TouchableOpacity style={styles.actionButton} onPress={handleShare} activeOpacity={0.7}>
+          <Ionicons name="share-social-outline" size={18} color={COLORS.textSecondary} />
           <Text style={styles.actionText}>Share</Text>
         </TouchableOpacity>
       </View>
@@ -263,7 +216,7 @@ export default function PostCard({ post, reload, currentUser }) {
         visible={showComments}
         postId={post.postId}
         onClose={() => setShowComments(false)}
-        onCommentAdded={() => setCommentsCount(prev => prev + 1)}
+        onCommentAdded={() => setCommentsCount((current) => current + 1)}
       />
     </View>
   );
@@ -272,98 +225,104 @@ export default function PostCard({ post, reload, currentUser }) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.bgCard,
-    borderRadius: 20,
-    padding: SPACING.lg,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
-    ...SHADOWS.card,
+    padding: SPACING.sm,
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   authorRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.md,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   avatarPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarInitials: {
-    color: '#FFF',
-    fontSize: FONTS.sizes.md,
-    fontWeight: '700',
+  avatarText: {
+    color: COLORS.textLight,
+    fontSize: FONTS.sizes.sm,
+    fontWeight: FONTS.weights.bold,
   },
   authorInfo: {
-    marginLeft: SPACING.md,
     flex: 1,
+    marginLeft: SPACING.xs,
   },
   authorName: {
     fontSize: FONTS.sizes.md,
-    fontWeight: '800',
+    fontWeight: FONTS.weights.bold,
     color: COLORS.textPrimary,
-    letterSpacing: 0.1,
   },
   postTime: {
+    marginTop: 2,
     fontSize: FONTS.sizes.xs,
     color: COLORS.textMuted,
-    marginTop: 2,
+  },
+  iconButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
+    marginTop: SPACING.sm,
     fontSize: FONTS.sizes.md,
     color: COLORS.textPrimary,
-    lineHeight: 23,
-    marginBottom: SPACING.md,
+    lineHeight: 24,
   },
-  mediaContainer: {
+  mediaStack: {
     marginTop: SPACING.sm,
-    marginBottom: SPACING.md,
-    borderRadius: RADIUS.md,
-    overflow: 'hidden',
+    gap: SPACING.xs,
   },
   mediaImage: {
     width: '100%',
-    height: 200,
+    height: 220,
     borderRadius: RADIUS.md,
-    marginTop: SPACING.xs,
+    backgroundColor: COLORS.black,
   },
   mediaVideo: {
     width: '100%',
-    height: 250,
+    height: 240,
     borderRadius: RADIUS.md,
-    marginTop: SPACING.xs,
-    backgroundColor: '#000',
+    backgroundColor: COLORS.black,
   },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.cardBorder,
-    marginBottom: SPACING.md,
-  },
-  actionsRow: {
+  actions: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.cardBorder,
   },
-  actionBtn: {
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 8,
-    borderRadius: RADIUS.pill,
-    backgroundColor: '#F6F9FC',
+    minHeight: 40,
+    paddingHorizontal: SPACING.xs,
   },
   actionText: {
+    marginLeft: SPACING.xs,
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
-    marginLeft: SPACING.xs,
-    fontWeight: '700',
+    fontWeight: FONTS.weights.semibold,
+  },
+  actionTextLiked: {
+    color: COLORS.likePink,
   },
 });

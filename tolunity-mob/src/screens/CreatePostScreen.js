@@ -1,30 +1,32 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Alert,
-  StatusBar,
-  KeyboardAvoidingView,
   Image,
+  KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { MediaTypeOptions } from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { createPost } from '../api/feedApi';
 import { getApiErrorMessage } from '../api/apiError';
-import InputField from '../components/InputField';
 import Button from '../components/Button';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import Container from '../components/Container';
+import InputField from '../components/InputField';
+import ScreenHeader from '../components/ScreenHeader';
+import SurfaceCard from '../components/SurfaceCard';
+import { COLORS, FONTS, RADIUS, SPACING } from '../styles/theme';
 
 export default function CreatePostScreen() {
   const router = useRouter();
-
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [mediaAssets, setMediaAssets] = useState([]);
@@ -96,85 +98,54 @@ export default function CreatePostScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Post</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View style={styles.card}>
-            <Text style={styles.label}>What's on your mind?</Text>
+      <ScreenHeader title="Create Post" onBack={() => router.back()} />
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Container scroll contentStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <SurfaceCard style={styles.card}>
             <InputField
-              placeholder="Share something with your community..."
+              label="Post"
+              placeholder="Share something with your community"
               value={content}
               onChangeText={setContent}
-              iconName="create-outline"
               autoCapitalize="sentences"
+              multiline
             />
+            <Text style={styles.counter}>{content.length} / 500</Text>
+          </SurfaceCard>
 
-            <Text style={[styles.charCount, content.length > 480 && styles.charCountWarning]}>
-              {content.length} / 500
-            </Text>
-          </View>
-
-          {mediaAssets.length > 0 && (
-            <View style={styles.mediaPreviewContainer}>
+          {mediaAssets.length > 0 ? (
+            <SurfaceCard style={styles.mediaCard}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {mediaAssets.map((asset, index) => (
-                  <View key={index} style={styles.mediaWrapper}>
-                    <Image source={{ uri: asset.uri }} style={styles.mediaThumbnail} />
-                    {asset.type === 'video' && (
-                      <View style={styles.playIconOverlay}>
-                        <Ionicons name="play" size={24} color="#FFF" />
+                  <View key={`${asset.uri}-${index}`} style={styles.mediaItem}>
+                    <Image source={{ uri: asset.uri }} style={styles.mediaImage} />
+                    {(asset.type === 'video' || asset.mediaType === 'VIDEO') ? (
+                      <View style={styles.videoBadge}>
+                        <Ionicons name="play" size={14} color={COLORS.textLight} />
                       </View>
-                    )}
-                    <TouchableOpacity style={styles.removeMediaBtn} onPress={() => removeMedia(index)}>
-                      <Ionicons name="close" size={16} color="#FFF" />
+                    ) : null}
+                    <TouchableOpacity style={styles.removeButton} onPress={() => removeMedia(index)}>
+                      <Ionicons name="close" size={16} color={COLORS.textLight} />
                     </TouchableOpacity>
                   </View>
                 ))}
               </ScrollView>
-            </View>
-          )}
+            </SurfaceCard>
+          ) : null}
 
-          <TouchableOpacity style={styles.attachBtn} onPress={pickMedia} activeOpacity={0.8}>
-            <View style={styles.attachIconWrap}>
-              <Ionicons name="image-outline" size={24} color={COLORS.primary} />
-            </View>
-            <Text style={styles.attachText}>Attach Photo/Video</Text>
+          <TouchableOpacity style={styles.attachRow} onPress={pickMedia} activeOpacity={0.8}>
+            <Text style={styles.attachText}>Attach photo or video</Text>
           </TouchableOpacity>
 
-          <View style={styles.tipsCard}>
-            <Text style={styles.tipsTitle}>
-              <Ionicons name="bulb-outline" size={14} color={COLORS.primary} /> Community Guidelines
-            </Text>
-            <Text style={styles.tipItem}>- Be respectful and constructive</Text>
-            <Text style={styles.tipItem}>- Share relevant community updates</Text>
-            <Text style={styles.tipItem}>- No spam or irrelevant content</Text>
-          </View>
+          <SurfaceCard style={styles.guidance}>
+            <Text style={styles.guidanceTitle}>Posting guidelines</Text>
+            <Text style={styles.guidanceText}>Be respectful and keep updates relevant to the community.</Text>
+            <Text style={styles.guidanceText}>Avoid spam and duplicate posts.</Text>
+          </SurfaceCard>
 
-          <Button
-            title="Share with Community"
-            onPress={handlePost}
-            loading={loading}
-            iconName="send-outline"
-            iconPosition="right"
-            style={styles.postBtn}
-          />
-
-          <Button title="Cancel" onPress={() => router.back()} variant="outline" style={styles.cancelBtn} />
-        </ScrollView>
+          <Button title="Share Post" onPress={handlePost} loading={loading} style={styles.primaryAction} />
+          <Button title="Cancel" onPress={() => router.back()} variant="outline" />
+        </Container>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -185,134 +156,87 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.feedBg,
   },
-  flex: { flex: 1 },
-  header: {
-    backgroundColor: COLORS.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    ...SHADOWS.header,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: FONTS.sizes.lg,
-    fontWeight: '700',
-    color: '#FFF',
+  flex: {
+    flex: 1,
   },
   content: {
-    padding: SPACING.lg,
-    paddingBottom: SPACING.xxxl,
+    paddingBottom: SPACING.xl,
   },
   card: {
-    backgroundColor: COLORS.bgCard,
-    borderRadius: RADIUS.xl,
-    padding: SPACING.xl,
-    marginBottom: SPACING.md,
-    ...SHADOWS.card,
+    marginBottom: SPACING.sm,
   },
-  label: {
-    fontSize: FONTS.sizes.lg,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.md,
-  },
-  charCount: {
+  counter: {
+    marginTop: SPACING.xs,
     fontSize: FONTS.sizes.xs,
     color: COLORS.textMuted,
     textAlign: 'right',
-    marginTop: -SPACING.sm,
   },
-  charCountWarning: {
-    color: COLORS.warning,
+  mediaCard: {
+    marginBottom: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    paddingLeft: SPACING.sm,
   },
-  tipsCard: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: RADIUS.xl,
-    padding: SPACING.lg,
-    marginBottom: SPACING.xl,
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.primary,
+  mediaItem: {
+    marginRight: SPACING.xs,
   },
-  tipsTitle: {
-    fontSize: FONTS.sizes.sm,
-    fontWeight: '700',
+  mediaImage: {
+    width: 104,
+    height: 104,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.black,
+  },
+  videoBadge: {
+    position: 'absolute',
+    left: 8,
+    bottom: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.overlaySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.overlay,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachRow: {
+    minHeight: 48,
+    marginBottom: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.bgInputBorder,
+    backgroundColor: COLORS.bgCard,
+    justifyContent: 'center',
+  },
+  attachText: {
+    fontSize: FONTS.sizes.md,
     color: COLORS.primary,
+    fontWeight: FONTS.weights.semibold,
+  },
+  guidance: {
     marginBottom: SPACING.sm,
   },
-  tipItem: {
+  guidanceTitle: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.semibold,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.xs,
+  },
+  guidanceText: {
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
     lineHeight: 22,
   },
-  postBtn: {
-    marginBottom: SPACING.md,
-  },
-  cancelBtn: {},
-  attachBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.bgCard,
-    padding: SPACING.lg,
-    borderRadius: RADIUS.xl,
-    marginBottom: SPACING.xl,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: COLORS.cardBorder,
-  },
-  attachIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: RADIUS.md,
-    backgroundColor: '#EEF2FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  attachText: {
-    fontSize: FONTS.sizes.md,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  mediaPreviewContainer: {
-    marginBottom: SPACING.md,
-  },
-  mediaWrapper: {
-    marginRight: SPACING.md,
-    position: 'relative',
-  },
-  mediaThumbnail: {
-    width: 100,
-    height: 100,
-    borderRadius: RADIUS.lg,
-    backgroundColor: '#000',
-  },
-  playIconOverlay: {
-    position: 'absolute',
-    top: 38,
-    left: 38,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  removeMediaBtn: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  primaryAction: {
+    marginBottom: SPACING.xs,
   },
 });

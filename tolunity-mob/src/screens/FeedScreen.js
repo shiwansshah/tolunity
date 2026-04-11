@@ -1,28 +1,26 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  RefreshControl,
-  TouchableOpacity,
   ActivityIndicator,
-  Image,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext';
-import { getFeed } from '../api/feedApi';
 import { getApiErrorMessage } from '../api/apiError';
+import { getFeed } from '../api/feedApi';
+import EmptyState from '../components/EmptyState';
 import PostCard from '../components/PostCard';
+import SurfaceCard from '../components/SurfaceCard';
+import { useAuth } from '../context/AuthContext';
+import { COLORS, FONTS, SPACING, TYPOGRAPHY } from '../styles/theme';
 import { FEED_PAGE_SIZE } from '../utils/constants';
-import { COLORS, FONTS, SPACING } from '../styles/theme';
-
-const logoImage = require('../../assets/images/logo.png');
 
 export default function FeedScreen() {
   const { user } = useAuth();
-
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,9 +53,9 @@ export default function FeedScreen() {
       }
 
       setHasMore(!data.last);
-    } catch (error) {
-      console.error('Feed error:', error);
-      setError(getApiErrorMessage(error, 'Failed to load feed. Pull down to retry.'));
+    } catch (requestError) {
+      console.error('Feed error:', requestError);
+      setError(getApiErrorMessage(requestError, 'Failed to load feed. Pull down to retry.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -68,7 +66,7 @@ export default function FeedScreen() {
   useFocusEffect(
     useCallback(() => {
       loadFeed(0, true);
-    }, [loadFeed])
+    }, [loadFeed]),
   );
 
   const onRefresh = () => {
@@ -84,220 +82,141 @@ export default function FeedScreen() {
     }
   };
 
-  const renderPost = ({ item }) => <PostCard post={item} reload={onRefresh} currentUser={user} />;
+  const renderPost = ({ item }) => (
+    <PostCard post={item} reload={onRefresh} currentUser={user} />
+  );
 
   const renderHeader = () => (
-    <View style={styles.feedHeader}>
-      <View style={styles.feedHero}>
-        <View style={styles.feedHeroTop}>
-          <View style={styles.feedHeroText}>
-            <Text style={styles.feedHeaderEyebrow}>Community feed</Text>
-            <Text style={styles.feedHeaderTitle}>Neighborhood Updates</Text>
-            <Text style={styles.feedHeaderSubtitle}>
-              {`See the latest posts, announcements, and shared moments${user?.name ? ` from ${user.name.split(' ')[0]}'s community` : ''}.`}
-            </Text>
-          </View>
-          <View style={styles.feedHeroLogoWrap}>
-            <Image source={logoImage} style={styles.feedHeroLogo} resizeMode="contain" />
-          </View>
-        </View>
-      </View>
+    <View style={styles.headerWrap}>
+      <SurfaceCard style={styles.hero}>
+        <Text style={TYPOGRAPHY.eyebrow}>Community Feed</Text>
+        <Text style={styles.heroTitle}>Neighborhood updates</Text>
+        <Text style={styles.heroCopy}>
+          {`See the latest posts, announcements, and shared moments${user?.name ? ` from ${user.name.split(' ')[0]}'s community` : ''}.`}
+        </Text>
+      </SurfaceCard>
     </View>
   );
 
-  const renderEmpty = () => {
-    if (loading) {
-      return null;
-    }
-
-    return (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="newspaper-outline" size={64} color={COLORS.textMuted} />
-        <Text style={styles.emptyTitle}>No posts yet</Text>
-        <Text style={styles.emptySubtitle}>Be the first to share something with your community.</Text>
-      </View>
-    );
-  };
-
   const renderFooter = () => {
     if (!loadingMore) {
-      return <View style={{ height: SPACING.xxl }} />;
+      return <View style={styles.footerSpace} />;
     }
 
     return (
       <View style={styles.footerLoader}>
-        <ActivityIndicator color={COLORS.primary} size="small" />
+        <ActivityIndicator size="small" color={COLORS.primary} />
       </View>
     );
   };
 
-  const renderError = () => (
-    <View style={styles.errorContainer}>
-      <Ionicons name="cloud-offline-outline" size={48} color={COLORS.textMuted} />
-      <Text style={styles.errorText}>{error}</Text>
-      <TouchableOpacity style={styles.retryBtn} onPress={() => loadFeed(0)}>
-        <Text style={styles.retryText}>Retry</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
   if (loading && posts.length === 0) {
     return (
-      <View style={styles.centerLoader}>
-        <ActivityIndicator color={COLORS.primary} size="large" />
-        <Text style={styles.loadingText}>Loading community feed...</Text>
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.helperText}>Loading community feed</Text>
       </View>
     );
   }
 
   if (error && posts.length === 0) {
-    return renderError();
+    return (
+      <View style={styles.center}>
+        <EmptyState
+          title="Unable to load feed"
+          description={error}
+          icon={<Ionicons name="cloud-offline-outline" size={32} color={COLORS.textMuted} />}
+        />
+        <TouchableOpacity style={styles.retryButton} onPress={() => loadFeed(0)}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={posts}
-        keyExtractor={(item) => item.postId?.toString()}
-        renderItem={renderPost}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={renderEmpty}
-        ListFooterComponent={renderFooter}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[COLORS.primary]}
-            tintColor={COLORS.primary}
-          />
-        }
-        onEndReached={onLoadMore}
-        onEndReachedThreshold={0.3}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-      />
-    </View>
+    <FlatList
+      data={posts}
+      keyExtractor={(item) => item.postId?.toString()}
+      renderItem={renderPost}
+      ListHeaderComponent={renderHeader}
+      ListEmptyComponent={(
+        <EmptyState
+          title="No posts yet"
+          description="Be the first to share something with your community."
+          icon={<Ionicons name="newspaper-outline" size={32} color={COLORS.textMuted} />}
+        />
+      )}
+      ListFooterComponent={renderFooter}
+      refreshControl={(
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[COLORS.primary]}
+          tintColor={COLORS.primary}
+        />
+      )}
+      onEndReached={onLoadMore}
+      onEndReachedThreshold={0.3}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.listContent}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.feedBg,
-  },
   listContent: {
-    paddingBottom: SPACING.xxl,
-  },
-  feedHeader: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.lg,
     paddingBottom: SPACING.md,
   },
-  feedHero: {
-    backgroundColor: COLORS.bgCard,
-    borderRadius: 24,
-    padding: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+  headerWrap: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.xs,
   },
-  feedHeroTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
+  hero: {
+    padding: SPACING.md,
   },
-  feedHeroText: {
-    flex: 1,
-  },
-  feedHeaderEyebrow: {
-    fontSize: FONTS.sizes.xs,
-    fontWeight: '800',
-    color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  feedHeaderTitle: {
-    fontSize: FONTS.sizes.xl,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
+  heroTitle: {
     marginTop: SPACING.xs,
-  },
-  feedHeaderSubtitle: {
-    marginTop: SPACING.sm,
-    color: COLORS.textSecondary,
-    lineHeight: 20,
-  },
-  feedHeroLogoWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: '#F7FAFD',
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  feedHeroLogo: {
-    width: 42,
-    height: 42,
-  },
-  centerLoader: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.feedBg,
-  },
-  loadingText: {
-    marginTop: SPACING.md,
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textSecondary,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.xxxl * 2,
-    paddingHorizontal: SPACING.xxxl,
-  },
-  emptyTitle: {
     fontSize: FONTS.sizes.xl,
-    fontWeight: '700',
+    fontWeight: FONTS.weights.heavy,
     color: COLORS.textPrimary,
-    marginTop: SPACING.lg,
   },
-  emptySubtitle: {
+  heroCopy: {
+    marginTop: SPACING.xs,
     fontSize: FONTS.sizes.sm,
+    lineHeight: 22,
     color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginTop: SPACING.sm,
-    lineHeight: 20,
   },
-  errorContainer: {
+  center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: SPACING.xxxl,
+    padding: SPACING.md,
     backgroundColor: COLORS.feedBg,
   },
-  errorText: {
-    fontSize: FONTS.sizes.md,
+  helperText: {
+    marginTop: SPACING.xs,
+    fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginTop: SPACING.md,
-    lineHeight: 22,
   },
-  retryBtn: {
-    marginTop: SPACING.xl,
+  retryButton: {
+    minHeight: 44,
+    paddingHorizontal: SPACING.sm,
+    justifyContent: 'center',
+    borderRadius: 12,
     backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    borderRadius: 50,
   },
   retryText: {
-    color: '#FFF',
-    fontWeight: '700',
     fontSize: FONTS.sizes.sm,
+    color: COLORS.textLight,
+    fontWeight: FONTS.weights.bold,
   },
   footerLoader: {
-    paddingVertical: SPACING.xl,
+    paddingVertical: SPACING.sm,
     alignItems: 'center',
+  },
+  footerSpace: {
+    height: SPACING.sm,
   },
 });

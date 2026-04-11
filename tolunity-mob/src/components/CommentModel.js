@@ -94,7 +94,7 @@ export default function CommentModal({ visible, onClose, postId, commentsCount }
           <View style={styles.inputRow}>
             <TextInput
               style={styles.input}
-              placeholder="Write a comment…"
+              placeholder="Write a comment..."
               placeholderTextColor={COLORS.textMuted}
               value={comment}
               onChangeText={setComment}

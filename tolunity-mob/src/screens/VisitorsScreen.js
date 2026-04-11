@@ -20,6 +20,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { useAuth } from '../context/AuthContext';
 import { createVisitor, getMyVisitors, verifyVisitorQr } from '../api/visitorApi';
 import { getApiErrorMessage } from '../api/apiError';
+import ScreenHeader from '../components/ScreenHeader';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import Button from '../components/Button';
 import InputField from '../components/InputField';
@@ -366,7 +367,7 @@ function CreatorVisitorsWorkspace() {
             Security will only accept the QR within the selected validity period. Use the generated card for a screenshot share.
           </Text>
 
-          <Button title="Generate Visitor QR" iconName="sparkles-outline" onPress={submit} loading={saving} />
+          <Button title="Generate Visitor QR" onPress={submit} loading={saving} />
         </SectionCard>
 
         <SectionCard
@@ -539,51 +540,42 @@ export default function VisitorsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-      <View style={styles.header}>
-        <Text style={styles.brandTitle}>TolUnity</Text>
-        <Text style={styles.headerTitle}>{isSecurity ? 'Security Visitors' : 'Visitors'}</Text>
-      </View>
+      <ScreenHeader
+        title="Visitors"
+        subtitle={isSecurity ? 'Security verification workspace' : 'Guest passes and QR access'}
+      />
       {isSecurity ? <SecurityVisitorsWorkspace /> : <CreatorVisitorsWorkspace />}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F6FB' },
-  header: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.xl,
-    ...SHADOWS.header,
-  },
-  brandTitle: { color: '#FFF', fontSize: FONTS.sizes.xxl, fontWeight: '900' },
-  headerTitle: { color: 'rgba(255,255,255,0.88)', fontSize: FONTS.sizes.sm, fontWeight: '700', marginTop: 2 },
-  content: { padding: SPACING.lg, paddingBottom: SPACING.xxxl },
+  container: { flex: 1, backgroundColor: COLORS.feedBg },
+  content: { padding: SPACING.md, paddingBottom: SPACING.xl },
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   card: {
-    backgroundColor: '#FFF',
-    borderRadius: 24,
-    padding: SPACING.lg,
-    marginBottom: SPACING.lg,
+    backgroundColor: COLORS.bgCard,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
     borderWidth: 1,
-    borderColor: '#E0E7F2',
+    borderColor: COLORS.cardBorder,
     ...SHADOWS.card,
   },
-  sectionHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: SPACING.lg },
+  sectionHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: SPACING.sm },
   sectionIcon: {
     width: 36,
     height: 36,
-    borderRadius: 12,
-    backgroundColor: '#EEF3FF',
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surfaceSoft,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
+    marginRight: SPACING.xs,
   },
   sectionTextWrap: { flex: 1 },
   sectionTitle: { fontSize: FONTS.sizes.lg, fontWeight: '800', color: COLORS.textPrimary },
   sectionSubtitle: { color: COLORS.textMuted, marginTop: 4, lineHeight: 18 },
-  dateFieldWrap: { marginBottom: SPACING.md },
+  dateFieldWrap: { marginBottom: SPACING.sm },
   dateFieldLabel: {
     fontSize: FONTS.sizes.sm,
     fontWeight: '700',
@@ -592,24 +584,24 @@ const styles = StyleSheet.create({
   },
   dateField: {
     minHeight: 54,
-    borderRadius: 16,
-    borderWidth: 1.2,
-    borderColor: '#C9D4E1',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.bgInputBorder,
+    backgroundColor: COLORS.bgCard,
+    paddingHorizontal: SPACING.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
+    gap: SPACING.xs,
   },
   dateFieldValue: { flex: 1, color: COLORS.textPrimary, fontSize: FONTS.sizes.md, fontWeight: '700' },
-  formHint: { color: COLORS.textMuted, marginBottom: SPACING.lg, lineHeight: 18 },
+  formHint: { color: COLORS.textMuted, marginBottom: SPACING.sm, lineHeight: 18 },
   visitorCard: {
     borderWidth: 1,
-    borderColor: '#E4EAF5',
-    borderRadius: 18,
-    padding: SPACING.md,
-    marginBottom: SPACING.md,
-    backgroundColor: '#FBFCFF',
+    borderColor: COLORS.cardBorder,
+    borderRadius: RADIUS.md,
+    padding: SPACING.sm,
+    marginBottom: SPACING.sm,
+    backgroundColor: COLORS.surfaceMuted,
   },
   visitorCardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: SPACING.md },
   visitorIdentity: { flexDirection: 'row', alignItems: 'center', flex: 1 },
@@ -617,10 +609,10 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#DDE6FF',
+    backgroundColor: COLORS.surfacePrimary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
+    marginRight: SPACING.xs,
   },
   avatarText: { color: COLORS.primary, fontWeight: '900', fontSize: FONTS.sizes.md },
   visitorInfo: { flex: 1 },
@@ -628,16 +620,16 @@ const styles = StyleSheet.create({
   visitorMeta: { color: COLORS.textMuted, marginTop: 2 },
   statusBadge: { paddingHorizontal: SPACING.md, paddingVertical: 6, borderRadius: RADIUS.pill },
   statusText: { fontWeight: '800', fontSize: FONTS.sizes.xs, textTransform: 'uppercase' },
-  badgeSuccess: { backgroundColor: '#E6F7EE' },
-  badgeSuccessText: { color: '#177A44' },
-  badgeWarning: { backgroundColor: '#FFF3D8' },
-  badgeWarningText: { color: '#9A6400' },
-  badgeDanger: { backgroundColor: '#FDE7E4' },
-  badgeDangerText: { color: '#B43A2A' },
-  badgeInfo: { backgroundColor: '#E9F4FF' },
-  badgeInfoText: { color: '#1F6FBA' },
+  badgeSuccess: { backgroundColor: COLORS.surfaceSuccess },
+  badgeSuccessText: { color: COLORS.success },
+  badgeWarning: { backgroundColor: COLORS.surfaceWarning },
+  badgeWarningText: { color: COLORS.warning },
+  badgeDanger: { backgroundColor: COLORS.surfaceDanger },
+  badgeDangerText: { color: COLORS.error },
+  badgeInfo: { backgroundColor: COLORS.surfacePrimary },
+  badgeInfoText: { color: COLORS.primary },
   detailsGrid: { marginTop: SPACING.md, gap: SPACING.sm },
-  detailBlock: { backgroundColor: '#FFF', borderRadius: 14, padding: SPACING.md, borderWidth: 1, borderColor: '#EDF1F8' },
+  detailBlock: { backgroundColor: COLORS.bgCard, borderRadius: RADIUS.md, padding: SPACING.sm, borderWidth: 1, borderColor: COLORS.cardBorder },
   detailLabel: { color: COLORS.textMuted, fontSize: FONTS.sizes.xs, fontWeight: '700', textTransform: 'uppercase' },
   detailValue: { color: COLORS.textPrimary, marginTop: 4, lineHeight: 19, fontWeight: '700' },
   visitorHint: { color: COLORS.textSecondary, marginTop: SPACING.md, lineHeight: 18 },
@@ -646,13 +638,13 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingVertical: SPACING.xxxl },
   emptyTitle: { marginTop: SPACING.md, color: COLORS.textPrimary, fontWeight: '800', fontSize: FONTS.sizes.md },
   emptyCopy: { marginTop: SPACING.sm, color: COLORS.textMuted, textAlign: 'center', lineHeight: 18 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(9,18,37,0.55)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: COLORS.overlay, justifyContent: 'flex-end' },
   modalSheet: {
-    backgroundColor: '#FFF',
-    padding: SPACING.xl,
-    borderTopLeftRadius: RADIUS.xxl,
-    borderTopRightRadius: RADIUS.xxl,
-    gap: SPACING.lg,
+    backgroundColor: COLORS.bgCard,
+    padding: SPACING.md,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    gap: SPACING.sm,
   },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: SPACING.md },
   modalTitle: { color: COLORS.textPrimary, fontWeight: '900', fontSize: FONTS.sizes.xl },
@@ -661,7 +653,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#EFF3FA',
+    backgroundColor: COLORS.surfaceSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -670,11 +662,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#FFF',
     paddingVertical: SPACING.xl,
-    borderRadius: 24,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: '#E6EBF5',
+    borderColor: COLORS.cardBorder,
   },
-  qrMetaCard: { borderRadius: 18, backgroundColor: '#F7F9FE', padding: SPACING.lg, borderWidth: 1, borderColor: '#E4EAF5' },
+  qrMetaCard: { borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceBlue, padding: SPACING.sm, borderWidth: 1, borderColor: COLORS.cardBorder },
   qrVisitorName: { color: COLORS.textPrimary, fontWeight: '900', fontSize: FONTS.sizes.lg },
   qrVisitorMeta: { color: COLORS.textMuted, marginTop: 4, lineHeight: 18 },
   qrBadge: { marginTop: SPACING.md, alignSelf: 'flex-start' },
@@ -683,10 +675,10 @@ const styles = StyleSheet.create({
   permissionCopy: { marginTop: SPACING.sm, color: COLORS.textMuted, textAlign: 'center', lineHeight: 18, marginBottom: SPACING.lg },
   cameraCard: {
     height: 320,
-    borderRadius: 24,
+    borderRadius: RADIUS.lg,
     overflow: 'hidden',
-    backgroundColor: '#081224',
-    marginBottom: SPACING.lg,
+    backgroundColor: COLORS.primaryDark,
+    marginBottom: SPACING.sm,
   },
   camera: { flex: 1 },
   cameraOverlay: {
@@ -703,30 +695,30 @@ const styles = StyleSheet.create({
     borderColor: '#FFF',
     backgroundColor: 'transparent',
   },
-  cameraHint: { color: '#FFF', fontWeight: '700', marginTop: SPACING.lg },
-  manualBlock: { borderTopWidth: 1, borderTopColor: '#E7ECF4', paddingTop: SPACING.lg },
+  cameraHint: { color: '#FFF', fontWeight: '700', marginTop: SPACING.sm },
+  manualBlock: { borderTopWidth: 1, borderTopColor: COLORS.cardBorder, paddingTop: SPACING.sm },
   manualTitle: { color: COLORS.textPrimary, fontWeight: '800', fontSize: FONTS.sizes.md, marginBottom: SPACING.sm },
   manualInput: {
     minHeight: 110,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#D8E0EC',
-    backgroundColor: '#F8FAFD',
-    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.bgInputBorder,
+    backgroundColor: COLORS.bgInput,
+    padding: SPACING.sm,
     color: COLORS.textPrimary,
     textAlignVertical: 'top',
   },
-  inlineButtons: { flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.md },
+  inlineButtons: { flexDirection: 'row', gap: SPACING.xs, marginTop: SPACING.sm },
   inlineButtonFlex: { flex: 1 },
-  verificationSuccessCard: { borderColor: '#D6EFE1', backgroundColor: '#FCFFFD' },
-  verificationErrorCard: { borderColor: '#F4D5CF', backgroundColor: '#FFFDFC' },
-  verificationHero: { borderRadius: 20, padding: SPACING.lg },
-  verificationHeroSuccess: { backgroundColor: '#1C8A5A' },
-  verificationHeroError: { backgroundColor: '#C24D3E' },
+  verificationSuccessCard: { borderColor: COLORS.cardBorder, backgroundColor: COLORS.bgCard },
+  verificationErrorCard: { borderColor: COLORS.cardBorder, backgroundColor: COLORS.bgCard },
+  verificationHero: { borderRadius: RADIUS.md, padding: SPACING.sm },
+  verificationHeroSuccess: { backgroundColor: COLORS.success },
+  verificationHeroError: { backgroundColor: COLORS.error },
   verificationHeroTitle: { color: '#FFF', fontWeight: '900', fontSize: FONTS.sizes.lg, marginTop: SPACING.sm },
   verificationHeroCopy: { color: 'rgba(255,255,255,0.88)', marginTop: 4, lineHeight: 18 },
-  verificationBody: { marginTop: SPACING.lg, gap: SPACING.md },
-  verificationRow: { borderWidth: 1, borderColor: '#E8EDF5', borderRadius: 16, padding: SPACING.md, backgroundColor: '#FFF' },
+  verificationBody: { marginTop: SPACING.sm, gap: SPACING.xs },
+  verificationRow: { borderWidth: 1, borderColor: COLORS.cardBorder, borderRadius: RADIUS.md, padding: SPACING.sm, backgroundColor: COLORS.bgCard },
   verificationLabel: { color: COLORS.textMuted, fontSize: FONTS.sizes.xs, fontWeight: '700', textTransform: 'uppercase' },
   verificationValue: { color: COLORS.textPrimary, fontWeight: '800', marginTop: 4, lineHeight: 19 },
 });

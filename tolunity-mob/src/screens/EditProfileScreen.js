@@ -1,28 +1,27 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Alert,
-  StatusBar,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '../context/AuthContext';
 import { updateProfile } from '../api/authApi';
-import InputField from '../components/InputField';
 import Button from '../components/Button';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import Container from '../components/Container';
+import InputField from '../components/InputField';
+import ScreenHeader from '../components/ScreenHeader';
+import SurfaceCard from '../components/SurfaceCard';
+import { useAuth } from '../context/AuthContext';
+import { COLORS, FONTS, RADIUS, SPACING } from '../styles/theme';
 
 export default function EditProfileScreen() {
   const router = useRouter();
   const { user, updateUser } = useAuth();
-
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phoneNumber || '');
   const [loading, setLoading] = useState(false);
@@ -41,8 +40,8 @@ export default function EditProfileScreen() {
   const handleSave = async () => {
     const trimmedName = name.trim();
     const trimmedPhone = phone.trim();
-
     const nextErrors = {};
+
     if (!trimmedName) {
       nextErrors.name = 'Name cannot be empty';
     }
@@ -62,7 +61,7 @@ export default function EditProfileScreen() {
       await updateProfile({ name: trimmedName, phoneNumber: trimmedPhone });
       await updateUser({ name: trimmedName, phoneNumber: trimmedPhone });
       Alert.alert('Success', 'Profile updated successfully', [
-        { text: 'OK', onPress: () => router.back() }
+        { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (error) {
       Alert.alert('Error', error.response?.data?.error || 'Failed to update profile');
@@ -74,21 +73,10 @@ export default function EditProfileScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-      
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View style={styles.card}>
+      <ScreenHeader title="Edit Profile" onBack={() => router.back()} />
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Container scroll contentStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <SurfaceCard style={styles.card}>
             <InputField
               label="Full Name"
               placeholder="Enter your name"
@@ -99,75 +87,60 @@ export default function EditProfileScreen() {
                   setErrors((current) => ({ ...current, name: null }));
                 }
               }}
-              iconName="person-outline"
+              autoCapitalize="words"
               error={errors.name}
             />
-
             <InputField
               label="Phone Number"
               placeholder="98XXXXXXXX"
               value={phone}
               onChangeText={handlePhoneChange}
-              iconName="call-outline"
               keyboardType="phone-pad"
               error={errors.phone}
             />
-
-            <View style={styles.infoBox}>
-              <Ionicons name="information-circle-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.infoText}>Use a 10-digit number that starts with 98 or 97. Email cannot be changed as it is linked to your identity.</Text>
+            <View style={styles.note}>
+              <Text style={styles.noteText}>
+                Use a 10-digit number that starts with 98 or 97. Email cannot be changed here.
+              </Text>
             </View>
-          </View>
+          </SurfaceCard>
 
-          <Button
-            title="Save Changes"
-            onPress={handleSave}
-            loading={loading}
-            iconName="checkmark-outline"
-            style={styles.saveBtn}
-          />
-
-          <Button
-            title="Cancel"
-            onPress={() => router.back()}
-            variant="outline"
-          />
-        </ScrollView>
+          <Button title="Save Changes" onPress={handleSave} loading={loading} style={styles.primaryAction} />
+          <Button title="Cancel" onPress={() => router.back()} variant="outline" />
+        </Container>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.feedBg },
-  flex: { flex: 1 },
-  header: {
-    backgroundColor: COLORS.primary,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
-    ...SHADOWS.header,
-  },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FONTS.sizes.lg, fontWeight: '700', color: '#FFF' },
-  content: { padding: SPACING.lg },
-  card: {
-    backgroundColor: COLORS.bgCard, borderRadius: RADIUS.xl,
-    padding: SPACING.xl, marginBottom: SPACING.xl, ...SHADOWS.card,
-  },
-  saveBtn: { marginBottom: SPACING.md },
-  infoBox: {
-    flexDirection: 'row',
-    backgroundColor: '#EEF2FF',
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    marginTop: SPACING.sm,
-    gap: SPACING.sm,
-    alignItems: 'center',
-  },
-  infoText: {
+  container: {
     flex: 1,
-    fontSize: FONTS.sizes.xs,
+    backgroundColor: COLORS.feedBg,
+  },
+  flex: {
+    flex: 1,
+  },
+  content: {
+    paddingBottom: SPACING.xl,
+  },
+  card: {
+    marginBottom: SPACING.sm,
+  },
+  note: {
+    marginTop: SPACING.xs,
+    padding: SPACING.sm,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  noteText: {
+    fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
-    lineHeight: 16,
+    lineHeight: 22,
+  },
+  primaryAction: {
+    marginBottom: SPACING.xs,
   },
 });

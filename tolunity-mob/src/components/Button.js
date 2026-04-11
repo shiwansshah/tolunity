@@ -1,13 +1,56 @@
 import React from 'react';
 import {
-  View,
+  ActivityIndicator,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
+  View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { COLORS, FONTS, RADIUS, SHADOWS, SPACING } from '../styles/theme';
+
+const VARIANTS = {
+  primary: {
+    container: {
+      backgroundColor: COLORS.primary,
+      borderColor: COLORS.primary,
+    },
+    text: { color: COLORS.textLight },
+    icon: COLORS.textLight,
+  },
+  secondary: {
+    container: {
+      backgroundColor: COLORS.surfaceSoft,
+      borderColor: COLORS.cardBorder,
+    },
+    text: { color: COLORS.textPrimary },
+    icon: COLORS.textPrimary,
+  },
+  outline: {
+    container: {
+      backgroundColor: COLORS.bgCard,
+      borderColor: COLORS.bgInputBorder,
+    },
+    text: { color: COLORS.textPrimary },
+    icon: COLORS.textPrimary,
+  },
+  ghost: {
+    container: {
+      backgroundColor: 'transparent',
+      borderColor: 'transparent',
+    },
+    text: { color: COLORS.primary },
+    icon: COLORS.primary,
+  },
+  danger: {
+    container: {
+      backgroundColor: COLORS.error,
+      borderColor: COLORS.error,
+    },
+    text: { color: COLORS.textLight },
+    icon: COLORS.textLight,
+  },
+};
 
 export default function Button({
   title,
@@ -21,65 +64,32 @@ export default function Button({
   textStyle,
 }) {
   const isDisabled = disabled || loading;
-
-  const variantStyles = {
-    primary: {
-      container: styles.primaryContainer,
-      text: styles.primaryText,
-      icon: '#FFFFFF',
-    },
-    secondary: {
-      container: styles.secondaryContainer,
-      text: styles.secondaryText,
-      icon: COLORS.primary,
-    },
-    outline: {
-      container: styles.outlineContainer,
-      text: styles.outlineText,
-      icon: COLORS.primary,
-    },
-    ghost: {
-      container: styles.ghostContainer,
-      text: styles.ghostText,
-      icon: COLORS.primary,
-    },
-  };
-
-  const v = variantStyles[variant] || variantStyles.primary;
+  const currentVariant = VARIANTS[variant] || VARIANTS.primary;
 
   return (
     <TouchableOpacity
       style={[
-        styles.base,
-        v.container,
+        styles.button,
+        currentVariant.container,
+        variant === 'primary' && SHADOWS.button,
         isDisabled && styles.disabled,
         style,
       ]}
       onPress={onPress}
       disabled={isDisabled}
-      activeOpacity={0.8}
+      activeOpacity={0.85}
     >
       {loading ? (
-        <ActivityIndicator color={v.icon} size="small" />
+        <ActivityIndicator color={currentVariant.icon} size="small" />
       ) : (
         <View style={styles.content}>
-          {iconName && iconPosition === 'left' && (
-            <Ionicons
-              name={iconName}
-              size={20}
-              color={v.icon}
-              style={styles.iconLeft}
-            />
-          )}
-          <Text style={[styles.text, v.text, textStyle]}>{title}</Text>
-          {iconName && iconPosition === 'right' && (
-            <Ionicons
-              name={iconName}
-              size={20}
-              color={v.icon}
-              style={styles.iconRight}
-            />
-          )}
+          {iconName && iconPosition === 'left' ? (
+            <Ionicons name={iconName} size={18} color={currentVariant.icon} style={styles.iconLeft} />
+          ) : null}
+          <Text style={[styles.text, currentVariant.text, textStyle]}>{title}</Text>
+          {iconName && iconPosition === 'right' ? (
+            <Ionicons name={iconName} size={18} color={currentVariant.icon} style={styles.iconRight} />
+          ) : null}
         </View>
       )}
     </TouchableOpacity>
@@ -87,65 +97,30 @@ export default function Button({
 }
 
 const styles = StyleSheet.create({
-  base: {
-    minHeight: 52,
-    borderRadius: 16,
+  button: {
+    minHeight: 48,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: SPACING.xl,
+    paddingHorizontal: SPACING.sm,
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   text: {
     fontSize: FONTS.sizes.md,
-    fontWeight: '800',
+    fontWeight: FONTS.weights.bold,
   },
   iconLeft: {
-    marginRight: SPACING.sm,
+    marginRight: SPACING.xs,
   },
   iconRight: {
-    marginLeft: SPACING.sm,
+    marginLeft: SPACING.xs,
   },
   disabled: {
     opacity: 0.55,
-  },
-
-  // Primary
-  primaryContainer: {
-    backgroundColor: COLORS.primary,
-    ...SHADOWS.button,
-  },
-  primaryText: {
-    color: '#FFFFFF',
-  },
-
-  // Secondary
-  secondaryContainer: {
-    backgroundColor: '#EEF3F8',
-    borderWidth: 1,
-    borderColor: '#D7E0EA',
-  },
-  secondaryText: {
-    color: COLORS.primary,
-  },
-
-  // Outline
-  outlineContainer: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.2,
-    borderColor: '#CBD7E4',
-  },
-  outlineText: {
-    color: COLORS.textPrimary,
-  },
-
-  // Ghost
-  ghostContainer: {
-    backgroundColor: 'transparent',
-  },
-  ghostText: {
-    color: COLORS.primary,
   },
 });

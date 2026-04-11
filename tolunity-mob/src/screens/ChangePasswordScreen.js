@@ -1,26 +1,23 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Alert,
-  StatusBar,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
+  StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { changePassword } from '../api/authApi';
-import InputField from '../components/InputField';
 import Button from '../components/Button';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import Container from '../components/Container';
+import InputField from '../components/InputField';
+import ScreenHeader from '../components/ScreenHeader';
+import SurfaceCard from '../components/SurfaceCard';
+import { COLORS, SPACING } from '../styles/theme';
 
 export default function ChangePasswordScreen() {
   const router = useRouter();
-
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -46,7 +43,7 @@ export default function ChangePasswordScreen() {
     try {
       await changePassword({ currentPassword, newPassword });
       Alert.alert('Success', 'Password changed successfully', [
-        { text: 'OK', onPress: () => router.back() }
+        { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (error) {
       Alert.alert('Error', error.response?.data?.error || 'Failed to change password');
@@ -58,93 +55,56 @@ export default function ChangePasswordScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-      
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Change Password</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View style={styles.card}>
-            <Text style={styles.cardDesc}>
-              To secure your account, please verify your current password before choosing a new one.
-            </Text>
-
+      <ScreenHeader title="Change Password" onBack={() => router.back()} />
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Container scroll contentStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <SurfaceCard style={styles.card}>
             <InputField
               label="Current Password"
               placeholder="Enter current password"
               value={currentPassword}
               onChangeText={setCurrentPassword}
-              iconName="lock-closed-outline"
               secureTextEntry
             />
-
             <InputField
               label="New Password"
               placeholder="Enter new password"
               value={newPassword}
               onChangeText={setNewPassword}
-              iconName="key-outline"
               secureTextEntry
             />
-
             <InputField
               label="Confirm New Password"
               placeholder="Re-enter new password"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
-              iconName="key-outline"
               secureTextEntry
             />
-          </View>
+          </SurfaceCard>
 
-          <Button
-            title="Update Password"
-            onPress={handleChangePassword}
-            loading={loading}
-            iconName="shield-checkmark-outline"
-            style={styles.updateBtn}
-          />
-
-          <Button
-            title="Cancel"
-            onPress={() => router.back()}
-            variant="outline"
-          />
-        </ScrollView>
+          <Button title="Update Password" onPress={handleChangePassword} loading={loading} style={styles.primaryAction} />
+          <Button title="Cancel" onPress={() => router.back()} variant="outline" />
+        </Container>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.feedBg },
-  flex: { flex: 1 },
-  header: {
-    backgroundColor: COLORS.primary,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
-    ...SHADOWS.header,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.feedBg,
   },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FONTS.sizes.lg, fontWeight: '700', color: '#FFF' },
-  content: { padding: SPACING.lg },
+  flex: {
+    flex: 1,
+  },
+  content: {
+    paddingBottom: SPACING.xl,
+  },
   card: {
-    backgroundColor: COLORS.bgCard, borderRadius: RADIUS.xl,
-    padding: SPACING.xl, marginBottom: SPACING.xl, ...SHADOWS.card,
+    marginBottom: SPACING.sm,
   },
-  cardDesc: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.lg,
-    lineHeight: 20,
+  primaryAction: {
+    marginBottom: SPACING.xs,
   },
-  updateBtn: { marginBottom: SPACING.md },
 });

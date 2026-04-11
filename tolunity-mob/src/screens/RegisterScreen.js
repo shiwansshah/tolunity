@@ -1,40 +1,34 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Alert,
-  StatusBar,
+  Image,
   KeyboardAvoidingView,
   Platform,
-  Image,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { registerUser } from '../api/authApi';
-import InputField from '../components/InputField';
 import Button from '../components/Button';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import Container from '../components/Container';
+import InputField from '../components/InputField';
+import SurfaceCard from '../components/SurfaceCard';
+import { COLORS, FONTS, RADIUS, SPACING, TYPOGRAPHY } from '../styles/theme';
 
 const USER_TYPES = [
   {
     key: 'OWNER',
     label: 'Owner',
-    icon: 'home',
     desc: 'I own a property in this community',
-    color: '#1E3FA0',
-    bgColor: '#EEF2FF',
   },
   {
     key: 'TENANT',
     label: 'Tenant',
-    icon: 'key',
     desc: 'I rent a property in this community',
-    color: '#2ECC71',
-    bgColor: '#E8FFF0',
   },
 ];
 
@@ -42,9 +36,8 @@ const logoImage = require('../../assets/images/logo.png');
 
 export default function RegisterScreen() {
   const router = useRouter();
-
   const [fullName, setFullName] = useState('');
-  const [username, setUsername] = useState(''); // used as email display label
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -53,49 +46,51 @@ export default function RegisterScreen() {
   const [errors, setErrors] = useState({});
 
   const validate = () => {
-    const newErrors = {};
-    if (!fullName.trim()) newErrors.fullName = 'Full name is required';
-    if (!username.trim()) newErrors.username = 'Username is required';
-    if (!email.trim()) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = 'Invalid email format';
-    if (!password) newErrors.password = 'Password is required';
-    else if (password.length < 6) newErrors.password = 'Password must be at least 6 characters';
-    if (!confirmPassword) newErrors.confirmPassword = 'Please confirm your password';
-    else if (password !== confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
-    if (!userType) newErrors.userType = 'Please select your account type';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const nextErrors = {};
+    if (!fullName.trim()) nextErrors.fullName = 'Full name is required';
+    if (!username.trim()) nextErrors.username = 'Username is required';
+    if (!email.trim()) nextErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(email)) nextErrors.email = 'Invalid email format';
+    if (!password) nextErrors.password = 'Password is required';
+    else if (password.length < 6) nextErrors.password = 'Password must be at least 6 characters';
+    if (!confirmPassword) nextErrors.confirmPassword = 'Please confirm your password';
+    else if (password !== confirmPassword) nextErrors.confirmPassword = 'Passwords do not match';
+    if (!userType) nextErrors.userType = 'Please select your account type';
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
   const handleRegister = async () => {
-    if (!validate()) return;
+    if (!validate()) {
+      return;
+    }
+
     setLoading(true);
     try {
       await registerUser({
         name: fullName.trim(),
         email: email.trim().toLowerCase(),
         password,
-        phoneNumber: username.trim(), // username stored in phoneNumber for now
+        phoneNumber: username.trim(),
         userType2: userType,
       });
       Alert.alert(
-        'Account Created! 🎉',
+        'Account Created',
         'Your account has been created successfully. Please sign in.',
-        [{ 
-          text: 'Sign In', 
+        [{
+          text: 'Sign In',
           onPress: () => {
-             setTimeout(() => {
-               router.replace('/login');
-             }, 150);
-          } 
-        }]
+            setTimeout(() => {
+              router.replace('/login');
+            }, 150);
+          },
+        }],
       );
-    } catch (err) {
-      if (err.response?.status === 409) {
-        setErrors({ email: err.response.data.error || 'Email is already registered!' });
+    } catch (error) {
+      if (error.response?.status === 409) {
+        setErrors({ email: error.response.data.error || 'Email is already registered' });
       } else {
-        const message =
-          err.response?.data?.error || 'Registration failed. Please try again.';
+        const message = error.response?.data?.error || 'Registration failed. Please try again.';
         Alert.alert('Registration Failed', message);
       }
     } finally {
@@ -104,352 +99,240 @@ export default function RegisterScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.flex} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.bgLight} translucent={false} />
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.logoSection}>
-            <View style={styles.logoBadge}>
-              <Image source={logoImage} style={styles.logoImage} resizeMode="contain" />
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Container scroll contentStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <View style={styles.brandBlock}>
+            <View style={styles.logoWrap}>
+              <Image source={logoImage} style={styles.logo} resizeMode="contain" />
             </View>
-            <Text style={styles.logoText}>TolUnity</Text>
-            <Text style={styles.tagline}>Create a resident account for your community space.</Text>
+            <Text style={styles.brandName}>TolUnity</Text>
+            <Text style={styles.brandCopy}>Create a resident account for your community space.</Text>
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardEyebrow}>Register</Text>
-            <Text style={styles.cardTitle}>Create Account</Text>
-            <Text style={styles.cardSubtitle}>Self-registration is available for owners and tenants only</Text>
+          <SurfaceCard style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={TYPOGRAPHY.eyebrow}>Register</Text>
+              <Text style={styles.cardTitle}>Create account</Text>
+              <Text style={styles.cardSubtitle}>
+                Self-registration is available for owners and tenants only.
+              </Text>
+            </View>
 
-            {/* User Type Selector */}
-            <Text style={styles.sectionLabel}>I am a...</Text>
-            <View style={styles.userTypeRow}>
+            <Text style={styles.sectionLabel}>Account type</Text>
+            <View style={styles.typeGrid}>
               {USER_TYPES.map((type) => {
-                const isSelected = userType === type.key;
+                const selected = userType === type.key;
                 return (
                   <TouchableOpacity
                     key={type.key}
-                    style={[
-                      styles.userTypeCard,
-                      isSelected && { borderColor: type.color, backgroundColor: type.bgColor },
-                    ]}
+                    style={[styles.typeCard, selected && styles.typeCardSelected]}
                     activeOpacity={0.7}
                     onPress={() => {
                       setUserType(type.key);
-                      if (errors.userType) setErrors((e) => ({ ...e, userType: null }));
+                      if (errors.userType) {
+                        setErrors((current) => ({ ...current, userType: null }));
+                      }
                     }}
                   >
-                    <View
-                      style={[
-                        styles.userTypeIconWrap,
-                        { backgroundColor: isSelected ? type.color : COLORS.bgInputBorder },
-                      ]}
-                    >
-                      <Ionicons
-                        name={type.icon}
-                        size={20}
-                        color={isSelected ? '#FFF' : COLORS.textMuted}
-                      />
-                    </View>
-                    <Text
-                      style={[
-                        styles.userTypeLabel,
-                        isSelected && { color: type.color, fontWeight: '800' },
-                      ]}
-                    >
-                      {type.label}
-                    </Text>
-                    <Text style={styles.userTypeDesc} numberOfLines={2}>
-                      {type.desc}
-                    </Text>
-                    {isSelected && (
-                      <View style={[styles.checkCircle, { backgroundColor: type.color }]}>
-                        <Ionicons name="checkmark" size={12} color="#FFF" />
-                      </View>
-                    )}
+                    <Text style={[styles.typeTitle, selected && styles.typeTitleSelected]}>{type.label}</Text>
+                    <Text style={styles.typeCopy}>{type.desc}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-            {errors.userType && (
-              <Text style={styles.errorText}>{errors.userType}</Text>
-            )}
+            {errors.userType ? <Text style={styles.errorText}>{errors.userType}</Text> : null}
 
-            {/* Full Name */}
             <InputField
               label="Full Name"
               placeholder="Enter your full name"
               value={fullName}
-              onChangeText={(v) => {
-                setFullName(v);
-                if (errors.fullName) setErrors((e) => ({ ...e, fullName: null }));
+              onChangeText={(value) => {
+                setFullName(value);
+                if (errors.fullName) setErrors((current) => ({ ...current, fullName: null }));
               }}
-              iconName="person-outline"
               autoCapitalize="words"
               error={errors.fullName}
             />
-
-            {/* Username */}
             <InputField
               label="Username"
               placeholder="Choose a username"
               value={username}
-              onChangeText={(v) => {
-                setUsername(v);
-                if (errors.username) setErrors((e) => ({ ...e, username: null }));
+              onChangeText={(value) => {
+                setUsername(value);
+                if (errors.username) setErrors((current) => ({ ...current, username: null }));
               }}
-              iconName="at-outline"
               error={errors.username}
             />
-
-            {/* Email */}
             <InputField
               label="Email"
               placeholder="Enter your email"
               value={email}
-              onChangeText={(v) => {
-                setEmail(v);
-                if (errors.email) setErrors((e) => ({ ...e, email: null }));
+              onChangeText={(value) => {
+                setEmail(value);
+                if (errors.email) setErrors((current) => ({ ...current, email: null }));
               }}
-              iconName="mail-outline"
               keyboardType="email-address"
               error={errors.email}
             />
-
-            {/* Password */}
             <InputField
               label="Password"
               placeholder="Create a password"
               value={password}
-              onChangeText={(v) => {
-                setPassword(v);
-                if (errors.password) setErrors((e) => ({ ...e, password: null }));
+              onChangeText={(value) => {
+                setPassword(value);
+                if (errors.password) setErrors((current) => ({ ...current, password: null }));
               }}
-              iconName="lock-closed-outline"
               secureTextEntry
               error={errors.password}
             />
-
-            {/* Confirm Password */}
             <InputField
               label="Confirm Password"
               placeholder="Confirm your password"
               value={confirmPassword}
-              onChangeText={(v) => {
-                setConfirmPassword(v);
-                if (errors.confirmPassword) setErrors((e) => ({ ...e, confirmPassword: null }));
+              onChangeText={(value) => {
+                setConfirmPassword(value);
+                if (errors.confirmPassword) {
+                  setErrors((current) => ({ ...current, confirmPassword: null }));
+                }
               }}
-              iconName="lock-closed-outline"
               secureTextEntry
               error={errors.confirmPassword}
             />
 
-            {/* Create Account Button */}
-            <Button
-              title="Create Account"
-              onPress={handleRegister}
-              loading={loading}
-              iconName="person-add-outline"
-              iconPosition="left"
-              style={styles.createBtn}
-            />
+            <Button title="Create Account" onPress={handleRegister} loading={loading} />
 
-            {/* Or divider */}
-            <View style={styles.orRow}>
-              <View style={styles.orLine} />
-              <Text style={styles.orText}>or</Text>
-              <View style={styles.orLine} />
-            </View>
-
-            {/* Sign In Link */}
-            <View style={styles.loginRow}>
-              <Text style={styles.loginText}>Already have an account? </Text>
-              <TouchableOpacity onPress={() => router.replace('/login')}>
-                <Text style={styles.loginLink}>Sign in here</Text>
+            <View style={styles.footerRow}>
+              <Text style={styles.footerText}>Already have an account?</Text>
+              <TouchableOpacity onPress={() => router.replace('/login')} activeOpacity={0.7}>
+                <Text style={styles.linkText}>Sign in here</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </ScrollView>
+          </SurfaceCard>
+        </Container>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: {
+  container: {
     flex: 1,
     backgroundColor: COLORS.bgLight,
   },
-  container: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.xxxl,
+  flex: {
+    flex: 1,
   },
-  logoSection: {
+  content: {
+    paddingVertical: SPACING.xl,
+  },
+  brandBlock: {
     alignItems: 'center',
-    marginBottom: SPACING.xxl,
+    marginBottom: SPACING.md,
   },
-  logoBadge: {
-    width: 92,
-    height: 92,
-    borderRadius: 28,
-    backgroundColor: '#FFFFFF',
+  logoWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
+    backgroundColor: COLORS.bgCard,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.lg,
-    ...SHADOWS.card,
+    marginBottom: SPACING.sm,
   },
-  logoImage: {
-    width: 62,
-    height: 62,
+  logo: {
+    width: 56,
+    height: 56,
   },
-  logoText: {
-    fontSize: 38,
-    fontWeight: '900',
+  brandName: {
+    fontSize: FONTS.sizes.xxl,
+    fontWeight: FONTS.weights.heavy,
     color: COLORS.primary,
-    letterSpacing: -1,
   },
-  tagline: {
+  brandCopy: {
+    marginTop: SPACING.xs,
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
+    lineHeight: 22,
     textAlign: 'center',
-    maxWidth: 280,
-    lineHeight: 19,
   },
   card: {
-    backgroundColor: COLORS.bgCard,
-    borderRadius: RADIUS.xxl,
-    padding: SPACING.xxl,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    ...SHADOWS.card,
+    padding: SPACING.md,
   },
-  cardEyebrow: {
-    alignSelf: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 6,
-    borderRadius: RADIUS.pill,
-    backgroundColor: '#ECF1F7',
-    color: COLORS.primary,
-    fontSize: FONTS.sizes.xs,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+  cardHeader: {
     marginBottom: SPACING.md,
   },
   cardTitle: {
-    fontSize: FONTS.sizes.xxl,
-    fontWeight: '800',
+    marginTop: SPACING.xs,
+    fontSize: FONTS.sizes.xl,
+    fontWeight: FONTS.weights.heavy,
     color: COLORS.textPrimary,
-    textAlign: 'center',
-    marginBottom: SPACING.xs,
   },
   cardSubtitle: {
+    marginTop: SPACING.xs,
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: SPACING.lg,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   sectionLabel: {
+    marginBottom: SPACING.xs,
     fontSize: FONTS.sizes.sm,
-    fontWeight: '700',
+    fontWeight: FONTS.weights.semibold,
     color: COLORS.textPrimary,
-    marginBottom: SPACING.sm,
   },
-  userTypeRow: {
+  typeGrid: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.lg,
+    gap: SPACING.xs,
+    marginBottom: SPACING.xs,
   },
-  userTypeCard: {
+  typeCard: {
     flex: 1,
-    borderRadius: RADIUS.lg,
-    borderWidth: 2,
+    padding: SPACING.sm,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
     borderColor: COLORS.bgInputBorder,
     backgroundColor: COLORS.bgInput,
-    padding: SPACING.md,
-    alignItems: 'center',
-    position: 'relative',
   },
-  userTypeIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.sm,
+  typeCardSelected: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.surfacePrimary,
   },
-  userTypeLabel: {
-    fontSize: FONTS.sizes.sm,
-    fontWeight: '600',
+  typeTitle: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.semibold,
     color: COLORS.textPrimary,
-    marginBottom: 2,
   },
-  userTypeDesc: {
-    fontSize: 9,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    lineHeight: 12,
+  typeTitleSelected: {
+    color: COLORS.primary,
   },
-  checkCircle: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
+  typeCopy: {
+    marginTop: 4,
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textSecondary,
+    lineHeight: 18,
   },
   errorText: {
+    marginBottom: SPACING.sm,
     fontSize: FONTS.sizes.xs,
     color: COLORS.error,
-    marginTop: -SPACING.sm,
-    marginBottom: SPACING.sm,
   },
-  createBtn: {
-    width: '100%',
-    marginTop: SPACING.sm,
-  },
-  orRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: SPACING.lg,
-  },
-  orLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.cardBorder,
-  },
-  orText: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textMuted,
-    marginHorizontal: SPACING.md,
-  },
-  loginRow: {
+  footerRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: SPACING.sm,
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
   },
-  loginText: {
+  footerText: {
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
   },
-  loginLink: {
+  linkText: {
     fontSize: FONTS.sizes.sm,
     color: COLORS.primary,
-    fontWeight: '700',
+    fontWeight: FONTS.weights.semibold,
   },
 });

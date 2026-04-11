@@ -1,46 +1,47 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  StatusBar,
   ActivityIndicator,
-  Modal,
-  TextInput,
   Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
+  FlatList,
   Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { MediaTypeOptions } from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useAlerts } from '../context/AlertContext';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import { createAlert } from '../api/alertApi';
 import { getApiErrorMessage } from '../api/apiError';
+import Button from '../components/Button';
+import EmptyState from '../components/EmptyState';
+import InputField from '../components/InputField';
+import ScreenHeader from '../components/ScreenHeader';
+import SurfaceCard from '../components/SurfaceCard';
+import { useAlerts } from '../context/AlertContext';
+import { COLORS, FONTS, RADIUS, SPACING } from '../styles/theme';
 
-const ALERT_COLOR = '#DC2626';
+const ALERT_COLOR = COLORS.error;
 
 const formatRelativeTime = (value) => {
   if (!value) return '';
-
   const date = new Date(value);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMinutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
   const diffHours = Math.floor(diffMinutes / 60);
   const diffDays = Math.floor(diffHours / 24);
-
   if (diffMinutes < 60) return `${diffMinutes} min ago`;
   if (diffHours < 24) return `${diffHours} hr${diffHours > 1 ? 's' : ''} ago`;
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays} days ago`;
-
   return date.toLocaleDateString();
 };
 
@@ -62,7 +63,8 @@ export default function AlertsScreen() {
   const pickMedia = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      return Alert.alert('Permission Required', 'Media permission is required to attach photos or videos.');
+      Alert.alert('Permission Required', 'Media permission is required to attach photos or videos.');
+      return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -79,7 +81,8 @@ export default function AlertsScreen() {
 
   const submitAlert = async () => {
     if (!title.trim() || !description.trim()) {
-      return Alert.alert('Validation', 'Title and description are required.');
+      Alert.alert('Validation', 'Title and description are required.');
+      return;
     }
 
     setSaving(true);
@@ -115,30 +118,24 @@ export default function AlertsScreen() {
   };
 
   const renderAlert = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.card, item.isRead ? styles.cardRead : styles.cardUnread]}
-      onPress={() => markAsRead(item.id)}
-      activeOpacity={0.85}
-    >
-      {!item.isRead && <View style={styles.unreadDot} />}
-      <View style={[styles.iconWrap, { backgroundColor: `${ALERT_COLOR}20` }]}>
-        <Ionicons name="alert-circle" size={22} color={ALERT_COLOR} />
-      </View>
-      <View style={styles.info}>
-        <View style={styles.topRow}>
-          <Text style={[styles.typeTag, item.isRead && styles.typeTagRead]}>Emergency Alert</Text>
+    <SurfaceCard style={[styles.card, !item.isRead && styles.cardUnread]}>
+      <TouchableOpacity onPress={() => markAsRead(item.id)} activeOpacity={0.85}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardTitleGroup}>
+            <Text style={styles.typeTag}>Emergency alert</Text>
+            <Text style={styles.cardTitle}>{item.title}</Text>
+          </View>
           <Text style={styles.time}>{formatRelativeTime(item.createdAt)}</Text>
         </View>
-        <Text style={[styles.title, item.isRead && styles.titleRead]}>{item.title}</Text>
-        <Text style={[styles.message, item.isRead && styles.messageRead]}>{item.description}</Text>
+        <Text style={styles.message}>{item.description}</Text>
         <Text style={styles.creator}>Raised by {item.createdByName}</Text>
-        {item.mediaList?.length > 0 && (
+
+        {item.mediaList?.length ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaStrip}>
             {item.mediaList.map((media) => (
-              <View key={media.id} style={styles.mediaCard}>
+              <View key={media.id} style={styles.mediaItem}>
                 {media.mediaType === 'VIDEO' ? (
                   <View style={styles.videoPlaceholder}>
-                    <Ionicons name="videocam" size={20} color="#FFF" />
                     <Text style={styles.videoText}>Video</Text>
                   </View>
                 ) : (
@@ -147,34 +144,23 @@ export default function AlertsScreen() {
               </View>
             ))}
           </ScrollView>
-        )}
-      </View>
-    </TouchableOpacity>
+        ) : null}
+      </TouchableOpacity>
+    </SurfaceCard>
   );
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Alerts</Text>
-          <Text style={styles.headerSubtitle}>Emergency broadcasts with optional photo or video evidence</Text>
-          {unreadCount > 0 && (
-            <Text style={styles.unreadLabel}>{unreadCount} unread</Text>
-          )}
-        </View>
-        <View style={styles.headerActions}>
-          {unreadCount > 0 && (
-            <TouchableOpacity onPress={markAllAsRead} style={styles.markAllBtn}>
-              <Text style={styles.markAllText}>Mark all read</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.raiseBtn}>
-            <Ionicons name="add" size={18} color="#FFF" />
-            <Text style={styles.raiseBtnText}>Raise</Text>
+      <ScreenHeader
+        title="Alerts"
+        subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'Emergency broadcasts'}
+        right={(
+          <TouchableOpacity style={styles.headerAction} onPress={() => setModalVisible(true)}>
+            <Text style={styles.headerActionText}>New</Text>
           </TouchableOpacity>
-        </View>
-      </View>
+        )}
+      />
 
       {loading && alerts.length === 0 ? (
         <View style={styles.loader}>
@@ -185,53 +171,56 @@ export default function AlertsScreen() {
           data={alerts}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderAlert}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           refreshing={loading}
           onRefresh={() => refreshAlerts()}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="alert-circle-outline" size={48} color={COLORS.textMuted} />
-              <Text style={styles.emptyText}>No emergency alerts</Text>
-            </View>
-          }
+          ListHeaderComponent={unreadCount > 0 ? (
+            <TouchableOpacity style={styles.markAll} onPress={markAllAsRead}>
+              <Text style={styles.markAllText}>Mark all as read</Text>
+            </TouchableOpacity>
+          ) : null}
+          ListEmptyComponent={(
+            <EmptyState
+              title="No emergency alerts"
+              description="Emergency broadcasts with optional photo or video evidence will appear here."
+              icon={<Ionicons name="alert-circle-outline" size={32} color={COLORS.textMuted} />}
+            />
+          )}
         />
       )}
 
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <View style={styles.modalCard}>
-            <View style={styles.topRow}>
-              <Text style={styles.modalTitle}>Raise Emergency Alert</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color={COLORS.textMuted} />
+        <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.sheet}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Raise Alert</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeButton}>
+                <Ionicons name="close" size={20} color={COLORS.textPrimary} />
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <TextInput
-                style={styles.input}
+              <InputField
+                label="Title"
                 placeholder="Alert title"
-                placeholderTextColor={COLORS.textMuted}
                 value={title}
                 onChangeText={setTitle}
               />
-              <TextInput
-                style={[styles.input, styles.textArea]}
+              <InputField
+                label="Description"
                 placeholder="Describe the emergency clearly"
-                placeholderTextColor={COLORS.textMuted}
                 value={description}
                 onChangeText={setDescription}
                 multiline
               />
 
-              {mediaAssets.length > 0 && (
+              {mediaAssets.length > 0 ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaStrip}>
                   {mediaAssets.map((asset, index) => (
-                    <View key={`${asset.uri}-${index}`} style={styles.mediaCard}>
+                    <View key={`${asset.uri}-${index}`} style={styles.mediaItem}>
                       {asset.type === 'video' ? (
                         <View style={styles.videoPlaceholder}>
-                          <Ionicons name="videocam" size={20} color="#FFF" />
                           <Text style={styles.videoText}>Video</Text>
                         </View>
                       ) : (
@@ -240,16 +229,13 @@ export default function AlertsScreen() {
                     </View>
                   ))}
                 </ScrollView>
-              )}
+              ) : null}
 
-              <TouchableOpacity style={styles.attachBtn} onPress={pickMedia}>
-                <Ionicons name="images-outline" size={18} color={ALERT_COLOR} />
-                <Text style={styles.attachBtnText}>Attach Photos / Videos</Text>
+              <TouchableOpacity style={styles.attachButton} onPress={pickMedia}>
+                <Text style={styles.attachButtonText}>Attach photo or video</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.submitBtn} onPress={submitAlert} disabled={saving}>
-                {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitBtnText}>Send Alert Now</Text>}
-              </TouchableOpacity>
+              <Button title="Send Alert" onPress={submitAlert} loading={saving} />
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -259,133 +245,153 @@ export default function AlertsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.feedBg },
-  header: {
-    backgroundColor: COLORS.primary,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.feedBg,
+  },
+  headerAction: {
+    minWidth: 64,
+    height: 36,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.whiteOverlay,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerActionText: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textLight,
+    fontWeight: FONTS.weights.bold,
+  },
+  loader: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
+    padding: SPACING.md,
+    paddingBottom: SPACING.xl,
+  },
+  markAll: {
+    marginBottom: SPACING.xs,
+    paddingVertical: SPACING.xs,
+  },
+  markAllText: {
+    fontSize: FONTS.sizes.sm,
+    color: COLORS.primary,
+    fontWeight: FONTS.weights.semibold,
+  },
+  card: {
+    marginBottom: SPACING.xs,
+  },
+  cardUnread: {
+    borderColor: ALERT_COLOR,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: SPACING.xs,
+    padding: SPACING.sm,
+    paddingBottom: SPACING.xs,
+  },
+  cardTitleGroup: {
+    flex: 1,
+  },
+  typeTag: {
+    fontSize: FONTS.sizes.xs,
+    color: ALERT_COLOR,
+    fontWeight: FONTS.weights.bold,
+  },
+  cardTitle: {
+    marginTop: 4,
+    fontSize: FONTS.sizes.md,
+    color: COLORS.textPrimary,
+    fontWeight: FONTS.weights.semibold,
+  },
+  time: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textMuted,
+  },
+  message: {
+    paddingHorizontal: SPACING.sm,
+    fontSize: FONTS.sizes.sm,
+    color: COLORS.textSecondary,
+    lineHeight: 22,
+  },
+  creator: {
+    paddingHorizontal: SPACING.sm,
+    paddingTop: SPACING.xs,
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textMuted,
+  },
+  mediaStrip: {
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
+    paddingLeft: SPACING.sm,
+  },
+  mediaItem: {
+    width: 96,
+    height: 96,
+    marginRight: SPACING.xs,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+    backgroundColor: COLORS.black,
+  },
+  mediaImage: {
+    width: '100%',
+    height: '100%',
+  },
+  videoPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: ALERT_COLOR,
+  },
+  videoText: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textLight,
+    fontWeight: FONTS.weights.bold,
+  },
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: COLORS.overlay,
+  },
+  sheet: {
+    maxHeight: '88%',
+    backgroundColor: COLORS.bgCard,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    padding: SPACING.md,
+  },
+  sheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    ...SHADOWS.header,
+    marginBottom: SPACING.sm,
   },
-  headerTitle: { fontSize: FONTS.sizes.xl, fontWeight: '800', color: '#FFF' },
-  headerSubtitle: { fontSize: FONTS.sizes.xs, color: 'rgba(255,255,255,0.7)', marginTop: 2, maxWidth: 220 },
-  unreadLabel: { fontSize: FONTS.sizes.xs, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  markAllBtn: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.pill,
-  },
-  markAllText: { color: '#FFF', fontSize: FONTS.sizes.xs, fontWeight: '600' },
-  raiseBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-    backgroundColor: ALERT_COLOR,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.pill,
-  },
-  raiseBtnText: { color: '#FFF', fontSize: FONTS.sizes.xs, fontWeight: '700' },
-  loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  listContent: { padding: SPACING.lg, paddingBottom: SPACING.xxxl },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: COLORS.bgCard,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
-    ...SHADOWS.card,
-    position: 'relative',
-  },
-  cardRead: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  cardUnread: { borderLeftWidth: 3, borderLeftColor: ALERT_COLOR },
-  unreadDot: {
-    position: 'absolute',
-    top: SPACING.md,
-    right: SPACING.md,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: ALERT_COLOR,
-  },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  info: { flex: 1 },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  typeTag: { fontSize: FONTS.sizes.xs, fontWeight: '700', color: ALERT_COLOR },
-  typeTagRead: { color: COLORS.textMuted },
-  time: { fontSize: FONTS.sizes.xs, color: COLORS.textMuted },
-  title: { fontSize: FONTS.sizes.md, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 4 },
-  titleRead: { color: COLORS.textSecondary },
-  message: { fontSize: FONTS.sizes.sm, color: COLORS.textSecondary, lineHeight: 20 },
-  messageRead: { color: COLORS.textMuted },
-  creator: { marginTop: 6, fontSize: FONTS.sizes.xs, color: COLORS.textMuted, fontWeight: '600' },
-  mediaStrip: { marginTop: SPACING.md, marginBottom: SPACING.sm },
-  mediaCard: {
-    width: 92,
-    height: 92,
-    borderRadius: RADIUS.md,
-    overflow: 'hidden',
-    marginRight: SPACING.sm,
-    backgroundColor: '#000',
-  },
-  mediaImage: { width: '100%', height: '100%' },
-  videoPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: ALERT_COLOR },
-  videoText: { color: '#FFF', fontSize: FONTS.sizes.xs, marginTop: 4 },
-  empty: { alignItems: 'center', paddingVertical: SPACING.xxxl * 2 },
-  emptyText: { marginTop: SPACING.md, fontSize: FONTS.sizes.md, color: COLORS.textSecondary },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  modalCard: {
-    backgroundColor: COLORS.bgCard,
-    borderTopLeftRadius: RADIUS.xxl,
-    borderTopRightRadius: RADIUS.xxl,
-    padding: SPACING.xxl,
-    maxHeight: '88%',
-  },
-  modalTitle: { fontSize: FONTS.sizes.xl, fontWeight: '800', color: COLORS.textPrimary },
-  input: {
-    backgroundColor: COLORS.bgInput,
-    borderWidth: 1,
-    borderColor: COLORS.bgInputBorder,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
+  sheetTitle: {
+    fontSize: FONTS.sizes.lg,
     color: COLORS.textPrimary,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.md,
+    fontWeight: FONTS.weights.bold,
   },
-  textArea: { minHeight: 110, textAlignVertical: 'top' },
-  attachBtn: {
-    flexDirection: 'row',
+  closeButton: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.sm,
+  },
+  attachButton: {
+    minHeight: 48,
+    marginBottom: SPACING.sm,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: ALERT_COLOR,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.md,
-    marginBottom: SPACING.md,
-  },
-  attachBtnText: { color: ALERT_COLOR, fontWeight: '700' },
-  submitBtn: {
-    backgroundColor: ALERT_COLOR,
-    borderRadius: RADIUS.lg,
-    paddingVertical: SPACING.lg,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  submitBtnText: { color: '#FFF', fontWeight: '800', fontSize: FONTS.sizes.md },
+  attachButtonText: {
+    fontSize: FONTS.sizes.sm,
+    color: ALERT_COLOR,
+    fontWeight: FONTS.weights.semibold,
+  },
 });

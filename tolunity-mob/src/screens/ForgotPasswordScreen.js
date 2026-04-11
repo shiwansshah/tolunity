@@ -1,23 +1,23 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Alert,
-  StatusBar,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import InputField from '../components/InputField';
-import Button from '../components/Button';
-import { requestPasswordReset, resetPasswordWithCode } from '../api/authApi';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { getApiErrorMessage } from '../api/apiError';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { requestPasswordReset, resetPasswordWithCode } from '../api/authApi';
+import Button from '../components/Button';
+import Container from '../components/Container';
+import InputField from '../components/InputField';
+import SurfaceCard from '../components/SurfaceCard';
+import { COLORS, FONTS, SPACING, TYPOGRAPHY } from '../styles/theme';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -103,18 +103,21 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.flex} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.bgLight} translucent={false} />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <View style={styles.card}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
-              <Ionicons name="arrow-back" size={20} color={COLORS.primary} />
+        <Container scroll contentStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <SurfaceCard style={styles.card}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backRow} activeOpacity={0.7}>
               <Text style={styles.backText}>Back to login</Text>
             </TouchableOpacity>
 
-            <Text style={styles.title}>Forgot Password</Text>
-            <Text style={styles.subtitle}>Enter your email to receive a verification code, then set a new password.</Text>
+            <View style={styles.intro}>
+              <Text style={TYPOGRAPHY.pageTitle}>Reset Password</Text>
+              <Text style={styles.subtitle}>
+                Enter your email to receive a verification code, then choose a new password.
+              </Text>
+            </View>
 
             <InputField
               label="Email"
@@ -126,7 +129,6 @@ export default function ForgotPasswordScreen() {
                   setErrors((current) => ({ ...current, email: null }));
                 }
               }}
-              iconName="mail-outline"
               keyboardType="email-address"
               error={errors.email}
             />
@@ -145,11 +147,9 @@ export default function ForgotPasswordScreen() {
                       setErrors((current) => ({ ...current, code: null }));
                     }
                   }}
-                  iconName="key-outline"
                   keyboardType="number-pad"
                   error={errors.code}
                 />
-
                 <InputField
                   label="New Password"
                   placeholder="Enter your new password"
@@ -160,11 +160,9 @@ export default function ForgotPasswordScreen() {
                       setErrors((current) => ({ ...current, newPassword: null }));
                     }
                   }}
-                  iconName="lock-closed-outline"
                   secureTextEntry
                   error={errors.newPassword}
                 />
-
                 <InputField
                   label="Confirm Password"
                   placeholder="Confirm your new password"
@@ -175,63 +173,54 @@ export default function ForgotPasswordScreen() {
                       setErrors((current) => ({ ...current, confirmPassword: null }));
                     }
                   }}
-                  iconName="lock-closed-outline"
                   secureTextEntry
                   error={errors.confirmPassword}
                 />
-
-                <Button title="Reset Password" onPress={handleResetPassword} loading={resetting} style={styles.primaryBtn} />
+                <Button title="Reset Password" onPress={handleResetPassword} loading={resetting} style={styles.primaryAction} />
                 <Button title="Resend Code" onPress={handleSendCode} variant="outline" loading={sending} />
               </>
             )}
-          </View>
-        </ScrollView>
+          </SurfaceCard>
+        </Container>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: {
+  container: {
     flex: 1,
     backgroundColor: COLORS.bgLight,
   },
-  container: {
+  flex: {
+    flex: 1,
+  },
+  content: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.xxxl,
+    paddingVertical: SPACING.xl,
   },
   card: {
-    backgroundColor: COLORS.bgCard,
-    borderRadius: RADIUS.xxl,
-    padding: SPACING.xxl,
-    ...SHADOWS.card,
+    padding: SPACING.md,
   },
-  backBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-    marginBottom: SPACING.xl,
+  backRow: {
+    marginBottom: SPACING.sm,
   },
   backText: {
-    color: COLORS.primary,
     fontSize: FONTS.sizes.sm,
-    fontWeight: '600',
+    color: COLORS.primary,
+    fontWeight: FONTS.weights.semibold,
   },
-  title: {
-    fontSize: FONTS.sizes.xxl,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.xs,
+  intro: {
+    marginBottom: SPACING.md,
   },
   subtitle: {
+    marginTop: SPACING.xs,
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.xl,
-    lineHeight: 20,
+    lineHeight: 22,
   },
-  primaryBtn: {
-    marginBottom: SPACING.md,
+  primaryAction: {
+    marginBottom: SPACING.xs,
   },
 });

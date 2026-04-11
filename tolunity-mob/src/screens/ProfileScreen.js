@@ -1,28 +1,30 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   Alert,
+  Image,
   ScrollView,
   StatusBar,
-  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { MediaTypeOptions } from 'expo-image-picker';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '../context/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
+import ListItem from '../components/ListItem';
+import ScreenHeader from '../components/ScreenHeader';
+import SurfaceCard from '../components/SurfaceCard';
 import { logoutUser, updateProfilePic } from '../api/authApi';
 import { suppressAuthFailureAlerts } from '../api/axiosInstance';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { useAuth } from '../context/AuthContext';
+import { COLORS, FONTS, RADIUS, SPACING } from '../styles/theme';
 
 export default function ProfileScreen() {
   const { user, logout, updateUser } = useAuth();
   const router = useRouter();
-  const [updatingPic, setUpdatingPic] = React.useState(false);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -47,22 +49,19 @@ export default function ProfileScreen() {
   };
 
   const handleUpdateProfilePic = async (uri) => {
-    setUpdatingPic(true);
     try {
       await updateProfilePic(uri);
       await updateUser({ profilePic: uri });
       Alert.alert('Success', 'Profile picture updated');
-    } catch (e) {
+    } catch (error) {
       Alert.alert('Error', 'Failed to update profile picture');
-    } finally {
-      setUpdatingPic(false);
     }
   };
 
   const confirmRemovePic = () => {
     Alert.alert('Remove Picture', 'Are you sure you want to remove your profile picture?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => handleUpdateProfilePic(null) }
+      { text: 'Remove', style: 'destructive', onPress: () => handleUpdateProfilePic(null) },
     ]);
   };
 
@@ -70,19 +69,17 @@ export default function ProfileScreen() {
     Alert.alert('Profile Picture', 'Choose an action', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Change Picture', onPress: pickImage },
-      user?.profilePic ? { text: 'Remove Picture', style: 'destructive', onPress: confirmRemovePic } : null
+      user?.profilePic ? { text: 'Remove Picture', style: 'destructive', onPress: confirmRemovePic } : null,
     ].filter(Boolean));
   };
 
   const doLogout = () => {
-    // Timeout added to let Mobile Alert animations finish before blocking UI thread & routing
     setTimeout(async () => {
       suppressAuthFailureAlerts();
       try {
         await logoutUser();
-      } catch (e) {
-        // Silent catch: if backend logout fails (session already dead/expired), 
-        // we still proceed to clear local state and redirect to login.
+      } catch (error) {
+        // Ignore backend logout failures and clear local state anyway.
       }
       await logout();
       router.replace('/login');
@@ -90,160 +87,110 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: doLogout },
-      ]
-    );
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: doLogout },
+    ]);
   };
 
   const getInitials = (name) => {
     if (!name) return '?';
     return name
       .split(' ')
-      .map((n) => n[0])
+      .map((part) => part[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
   };
 
+  const badgeLabel = user?.userType === 'OWNER'
+    ? 'Owner'
+    : user?.userType === 'TENANT'
+      ? 'Tenant'
+      : user?.userType === 'ADMIN'
+        ? 'Admin'
+        : user?.userType === 'SECURITY'
+          ? 'Security'
+          : null;
+
   const menuItems = [
     {
-      icon: 'person-outline',
       label: 'Edit Profile',
-      action: () => router.push('/edit-profile')
+      subtitle: 'Update your name and phone number',
+      action: () => router.push('/edit-profile'),
     },
     {
-      icon: 'lock-open-outline',
       label: 'Change Password',
-      action: () => router.push('/change-password')
+      subtitle: 'Manage your account security',
+      action: () => router.push('/change-password'),
     },
     {
-      icon: 'information-circle-outline',
       label: 'About TolUnity',
-      action: () => router.push('/about-tolunity')
+      subtitle: 'Read more about the platform',
+      action: () => router.push('/about-tolunity'),
     },
   ];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} translucent={false} />
+      <ScreenHeader title="Profile" />
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
-        </View>
-
-        {/* Profile Card */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              {user?.profilePic ? (
-                <Image source={{ uri: user.profilePic }} style={styles.avatarImage} />
-              ) : (
-                <Text style={styles.avatarText}>
-                  {getInitials(user?.name)}
-                </Text>
-              )}
-            </View>
-            <TouchableOpacity style={styles.editAvatarBtn} activeOpacity={0.8} onPress={handleEditPic}>
-              <Ionicons name="pencil" size={14} color="#FFF" />
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.userName}>{user?.name || 'community member'}</Text>
-          <Text style={styles.userEmail}>{user?.email || ''}</Text>
-
-          <View style={{ flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.md }}>
-            {/* User Type Badge */}
-            {user?.userType && (
-              <View style={[styles.roleBadge, {
-                backgroundColor: user.userType === 'OWNER' ? '#EEF2FF' :
-                                 user.userType === 'TENANT' ? '#E8FFF0' :
-                                 user.userType === 'ADMIN' ? '#FDECEC' : '#FFF9E6',
-              }]}>
-                <Ionicons
-                  name={user.userType === 'OWNER' ? 'home' :
-                        user.userType === 'TENANT' ? 'key' :
-                        user.userType === 'ADMIN' ? 'shield-checkmark' : 'shield-checkmark'}
-                  size={12}
-                  color={user.userType === 'OWNER' ? COLORS.primary :
-                         user.userType === 'TENANT' ? '#2ECC71' :
-                         user.userType === 'ADMIN' ? COLORS.error : '#F39C12'}
-                />
-                <Text style={[styles.roleText, {
-                  color: user.userType === 'OWNER' ? COLORS.primary :
-                         user.userType === 'TENANT' ? '#2ECC71' :
-                         user.userType === 'ADMIN' ? COLORS.error : '#F39C12',
-                }]}>
-                  {user.userType === 'OWNER' ? 'Owner' :
-                   user.userType === 'TENANT' ? 'Tenant' :
-                   user.userType === 'ADMIN' ? 'Admin' : 'Security'}
-                </Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <SurfaceCard style={styles.profileCard}>
+          <TouchableOpacity style={styles.avatarWrap} onPress={handleEditPic} activeOpacity={0.8}>
+            {user?.profilePic ? (
+              <Image source={{ uri: user.profilePic }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
               </View>
             )}
+          </TouchableOpacity>
 
-            {/* Role Badge */}
-            <View style={styles.roleBadge}>
-              <Ionicons
-                name={user?.userRole === 'ADMIN' ? 'shield-checkmark' : 'people'}
-                size={12}
-                color={COLORS.primary}
-              />
-              <Text style={styles.roleText}>
+          <Text style={styles.userName}>{user?.name || 'Community member'}</Text>
+          <Text style={styles.userEmail}>{user?.email || ''}</Text>
+
+          <View style={styles.badgeRow}>
+            {badgeLabel ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{badgeLabel}</Text>
+              </View>
+            ) : null}
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
                 {user?.userRole === 'ADMIN' ? 'Administrator' : 'Community User'}
               </Text>
             </View>
           </View>
-        </View>
+        </SurfaceCard>
 
-        {/* Menu Items */}
-        <View style={styles.menuCard}>
+        <SurfaceCard style={styles.menuCard}>
           {menuItems.map((item, index) => (
-            <TouchableOpacity
+            <ListItem
               key={item.label}
-              style={[
-                styles.menuItem,
-                index < menuItems.length - 1 && styles.menuItemBorder,
-              ]}
-              activeOpacity={0.7}
+              title={item.label}
+              subtitle={item.subtitle}
               onPress={item.action}
-            >
-              <View style={styles.menuIconWrap}>
-                <Ionicons name={item.icon} size={20} color={COLORS.primary} />
-              </View>
-              <Text style={styles.menuLabel}>{item.label}</Text>
-              <Ionicons
-                name="chevron-forward"
-                size={16}
-                color={COLORS.textMuted}
-              />
-            </TouchableOpacity>
+              showDivider={index < menuItems.length - 1}
+              trailing={<Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />}
+            />
           ))}
-        </View>
+        </SurfaceCard>
 
-        {/* Logout Button */}
-        <TouchableOpacity
-          style={styles.logoutBtn}
-          onPress={handleLogout}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
-          <Text style={styles.logoutText}>Sign Out</Text>
-        </TouchableOpacity>
+        <ButtonRow onPress={handleLogout} />
 
-        {/* App version */}
         <Text style={styles.version}>TolUnity v1.0.0</Text>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function ButtonRow({ onPress }) {
+  return (
+    <TouchableOpacity style={styles.logoutButton} onPress={onPress} activeOpacity={0.8}>
+      <Text style={styles.logoutText}>Sign Out</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -252,147 +199,90 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.feedBg,
   },
-  header: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    paddingTop: SPACING.lg,
-    ...SHADOWS.header,
-  },
-  headerTitle: {
-    fontSize: FONTS.sizes.xl,
-    fontWeight: '800',
-    color: '#FFF',
+  content: {
+    padding: SPACING.md,
+    paddingBottom: SPACING.xl,
   },
   profileCard: {
-    backgroundColor: COLORS.bgCard,
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.lg,
-    borderRadius: RADIUS.xxl,
-    padding: SPACING.xxl,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    ...SHADOWS.card,
+    marginBottom: SPACING.sm,
+    padding: SPACING.md,
   },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: SPACING.md,
+  avatarWrap: {
+    marginBottom: SPACING.sm,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.primary,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+  },
+  avatarFallback: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  avatarImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    backgroundColor: COLORS.primary,
   },
   avatarText: {
-    fontSize: FONTS.sizes.xxl,
-    fontWeight: '800',
-    color: '#FFF',
-  },
-  editAvatarBtn: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: COLORS.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFF',
+    fontSize: FONTS.sizes.xl,
+    fontWeight: FONTS.weights.heavy,
+    color: COLORS.textLight,
   },
   userName: {
     fontSize: FONTS.sizes.xl,
-    fontWeight: '800',
+    fontWeight: FONTS.weights.heavy,
     color: COLORS.textPrimary,
+    textAlign: 'center',
   },
   userEmail: {
+    marginTop: 4,
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
+    textAlign: 'center',
   },
-  roleBadge: {
+  badgeRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: SPACING.md,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    marginTop: SPACING.sm,
+  },
+  badge: {
+    paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.pill,
-    gap: SPACING.xs,
-  },
-  roleText: {
-    fontSize: FONTS.sizes.xs,
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  menuCard: {
-    backgroundColor: COLORS.bgCard,
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.lg,
-    borderRadius: RADIUS.xl,
-    overflow: 'hidden',
+    backgroundColor: COLORS.surfaceSoft,
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
-    ...SHADOWS.card,
   },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    minHeight: 68,
+  badgeText: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.primary,
+    fontWeight: FONTS.weights.semibold,
   },
-  menuItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
+  menuCard: {
+    marginBottom: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
   },
-  menuIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.sm,
-    backgroundColor: '#EEF2FF',
+  logoutButton: {
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  menuLabel: {
-    flex: 1,
-    fontSize: FONTS.sizes.md,
-    color: COLORS.textPrimary,
-    fontWeight: '500',
-  },
-  logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFF5F5',
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    borderRadius: RADIUS.xl,
-    gap: SPACING.sm,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: '#FFE0E0',
+    borderColor: COLORS.error,
+    backgroundColor: COLORS.bgCard,
   },
   logoutText: {
     fontSize: FONTS.sizes.md,
     color: COLORS.error,
-    fontWeight: '700',
+    fontWeight: FONTS.weights.bold,
   },
   version: {
+    marginTop: SPACING.sm,
     textAlign: 'center',
     fontSize: FONTS.sizes.xs,
     color: COLORS.textMuted,
-    marginTop: SPACING.xl,
-    marginBottom: SPACING.xxxl,
   },
 });
