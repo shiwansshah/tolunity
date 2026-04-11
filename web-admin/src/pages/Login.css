@@ -37,7 +37,7 @@
 .login-brand-mark {
   width: 84px;
   height: 84px;
-  border-radius: 24px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -59,7 +59,7 @@
   justify-content: center;
   min-height: 1.9rem;
   padding: 0.2rem 0.8rem;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   border: 1px solid #d3deec;
   background: var(--primary-soft);
   color: var(--primary);

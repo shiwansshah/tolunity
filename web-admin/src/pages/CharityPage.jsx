@@ -1,30 +1,30 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
-import { CalendarRange, HandCoins, Heart, Search, Wallet } from 'lucide-react';
-import { PageHeader, Card, Badge, Button } from '../components/UI';
 import api from '../services/api';
 import { getApiErrorMessage } from '../services/apiError';
-import './CharityPage.css';
-
-const SOURCE_VARIANTS = {
-  APP: 'primary',
-  MANUAL: 'warning',
-};
+import {
+  Badge,
+  Banner,
+  Button,
+  Field,
+  PageHeader,
+  inputClass,
+  tableCellClass,
+  tableHeaderClass,
+} from '../components/UI';
 
 const formatNPR = (amount) => `NPR ${(amount || 0).toLocaleString('en-IN')}`;
 
 const CharityPage = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [message, setMessage] = useState(null);
   const [search, setSearch] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [sourceFilter, setSourceFilter] = useState('ALL');
-  const [isManualOpen, setIsManualOpen] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [banner, setBanner] = useState(null);
   const [form, setForm] = useState({
     donorName: '',
     amount: '',
@@ -35,9 +35,9 @@ const CharityPage = () => {
     try {
       const response = await api.get('/admin/charity');
       setData(response.data);
-      setError(null);
+      setMessage(null);
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'Failed to load charity data'));
+      setMessage({ tone: 'error', text: getApiErrorMessage(requestError, 'Failed to load charity data') });
     } finally {
       setLoading(false);
     }
@@ -47,44 +47,35 @@ const CharityPage = () => {
     fetchCharity();
   }, []);
 
-  useEffect(() => {
-    if (!isManualOpen) return undefined;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isManualOpen]);
-
   const filteredDonations = useMemo(() => {
     const donations = Array.isArray(data?.donations) ? data.donations : [];
     return donations.filter((donation) => {
-    const searchValue = search.trim().toLowerCase();
-    const source = (donation.entrySource || 'APP').toUpperCase();
-    const createdAt = donation.createdAt ? new Date(donation.createdAt) : null;
-    const from = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
-    const to = toDate ? new Date(`${toDate}T23:59:59`) : null;
-
-    const sourceMatch = sourceFilter === 'ALL' || source === sourceFilter;
-    const searchMatch = !searchValue || [
-      donation.donorName,
-      donation.message,
-      source,
-    ].some((value) => value?.toLowerCase().includes(searchValue));
-    const fromMatch = !from || (createdAt && createdAt >= from);
-    const toMatch = !to || (createdAt && createdAt <= to);
-
-    return sourceMatch && searchMatch && fromMatch && toMatch;
+      const query = search.trim().toLowerCase();
+      const source = (donation.entrySource || 'APP').toUpperCase();
+      const createdAt = donation.createdAt ? new Date(donation.createdAt) : null;
+      const from = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
+      const to = toDate ? new Date(`${toDate}T23:59:59`) : null;
+      const sourceMatch = sourceFilter === 'ALL' || source === sourceFilter;
+      const queryMatch =
+        !query ||
+        [donation.donorName, donation.message, source]
+          .some((value) => value?.toLowerCase().includes(query));
+      const fromMatch = !from || (createdAt && createdAt >= from);
+      const toMatch = !to || (createdAt && createdAt <= to);
+      return sourceMatch && queryMatch && fromMatch && toMatch;
     });
   }, [data, search, fromDate, toDate, sourceFilter]);
 
-  const filteredStats = useMemo(() => ({
-    totalFund: filteredDonations.reduce((sum, donation) => sum + (donation.amount || 0), 0),
-    totalDonations: filteredDonations.length,
-    manualEntries: filteredDonations.filter((donation) => (donation.entrySource || 'APP').toUpperCase() === 'MANUAL').length,
-  }), [filteredDonations]);
+  const filteredStats = useMemo(
+    () => ({
+      totalFund: filteredDonations.reduce((sum, donation) => sum + (donation.amount || 0), 0),
+      totalDonations: filteredDonations.length,
+      manualEntries: filteredDonations.filter(
+        (donation) => (donation.entrySource || 'APP').toUpperCase() === 'MANUAL'
+      ).length,
+    }),
+    [filteredDonations]
+  );
 
   const clearFilters = () => {
     setSearch('');
@@ -96,11 +87,11 @@ const CharityPage = () => {
   const handleCreateManualEntry = async () => {
     const amount = Number(form.amount);
     if (!form.donorName.trim()) {
-      setBanner({ type: 'error', text: 'Donor name is required.' });
+      setMessage({ tone: 'error', text: 'Donor name is required.' });
       return;
     }
     if (!amount || amount <= 0) {
-      setBanner({ type: 'error', text: 'Enter a valid donation amount.' });
+      setMessage({ tone: 'error', text: 'Enter a valid donation amount.' });
       return;
     }
 
@@ -111,228 +102,200 @@ const CharityPage = () => {
         amount,
         message: form.message.trim(),
       });
-      setBanner({ type: 'success', text: 'Manual charity entry recorded.' });
+      setMessage({ tone: 'success', text: 'Manual charity entry recorded.' });
       setForm({ donorName: '', amount: '', message: '' });
-      setIsManualOpen(false);
+      setShowManualForm(false);
       await fetchCharity();
     } catch (requestError) {
-      setBanner({ type: 'error', text: getApiErrorMessage(requestError, 'Failed to save manual entry') });
+      setMessage({ tone: 'error', text: getApiErrorMessage(requestError, 'Failed to save manual entry') });
     } finally {
       setSaving(false);
     }
   };
 
+  const exportCSV = () => {
+    const header = 'Donor,Source,Amount,Message,RecordedBy,CreatedAt';
+    const lines = filteredDonations.map((donation) =>
+      [
+        `"${donation.donorName || ''}"`,
+        (donation.entrySource || 'APP').toUpperCase(),
+        donation.amount || 0,
+        `"${donation.message || ''}"`,
+        `"${donation.recordedByName || ''}"`,
+        donation.createdAt ? format(new Date(donation.createdAt), 'yyyy-MM-dd HH:mm:ss') : '',
+      ].join(',')
+    );
+    const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' });
+    const link = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(blob),
+      download: `charity_${format(new Date(), 'yyyyMMdd')}.csv`,
+    });
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
   if (loading) {
-    return <div className="p-8 text-center text-muted">Loading charity data...</div>;
+    return <div className="px-3 py-4 text-[13px] text-slate-500">Loading charity data...</div>;
   }
 
   if (!data) {
-    return <div className="p-8 text-danger">Failed to load charity data</div>;
+    return <div className="px-3 py-4 text-[13px] text-slate-500">No charity data available.</div>;
   }
 
   return (
-    <div className="fade-in">
+    <div className="text-[13px]">
       <PageHeader
-        title="Community Charity Fund"
-        subtitle="Track donations, review contribution periods, and record offline charity entries from one place."
-        action={(
-          <Button onClick={() => setIsManualOpen(true)}>
-            <HandCoins size={14} />
-            Add Manual Entry
-          </Button>
-        )}
+        eyebrow="Fund"
+        title="Charity Fund"
+        subtitle="Filter donation records, export the ledger, and record offline contributions."
+        actions={
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={exportCSV}>
+              Export
+            </Button>
+            <Button onClick={() => setShowManualForm((current) => !current)}>
+              {showManualForm ? 'Close Entry Form' : 'Add Manual Entry'}
+            </Button>
+          </div>
+        }
       />
 
-      {banner && (
-        <div className={`alert-banner ${banner.type === 'success' ? 'alert-success' : 'alert-error'}`}>
-          {banner.text}
-          <button onClick={() => setBanner(null)} className="alert-close">
-            &times;
-          </button>
-        </div>
-      )}
+      {message && <Banner tone={message.tone}>{message.text}</Banner>}
 
-      {error && <div className="alert-banner alert-error">{error}</div>}
-
-      <div className="charity-hero-grid">
-        <Card className="charity-hero-card charity-hero-primary">
-          <div className="charity-hero-icon">
-            <Heart size={24} />
+      <div className="grid border-b border-slate-200 md:grid-cols-3">
+        {[
+          ['Filtered Fund', formatNPR(filteredStats.totalFund)],
+          ['Donations In View', filteredStats.totalDonations],
+          ['Manual Entries', filteredStats.manualEntries],
+        ].map(([label, value], index, rows) => (
+          <div
+            key={label}
+            className={
+              index < rows.length - 1
+                ? 'border-b border-slate-200 px-5 py-4 md:border-b-0 md:border-r'
+                : 'px-5 py-4'
+            }
+          >
+            <div className="text-[11px] uppercase tracking-widest text-slate-500">{label}</div>
+            <div className="mt-0.5 font-mono text-[13px] text-slate-900">{value}</div>
           </div>
-          <div>
-            <p className="charity-kpi-label">Filtered Fund Total</p>
-            <h2 className="charity-kpi-value">{formatNPR(filteredStats.totalFund)}</h2>
-            <p className="charity-kpi-meta">Overall lifetime fund: {formatNPR(data.totalFund)}</p>
-          </div>
-        </Card>
-
-        <Card className="charity-hero-card">
-          <div className="charity-hero-icon charity-hero-icon-soft">
-            <Wallet size={22} />
-          </div>
-          <div>
-            <p className="charity-kpi-label">Donations In View</p>
-            <h2 className="charity-kpi-value charity-kpi-value-dark">{filteredStats.totalDonations}</h2>
-            <p className="charity-kpi-meta">All recorded donations: {data.totalDonations}</p>
-          </div>
-        </Card>
-
-        <Card className="charity-hero-card">
-          <div className="charity-hero-icon charity-hero-icon-gold">
-            <CalendarRange size={22} />
-          </div>
-          <div>
-            <p className="charity-kpi-label">Manual Entries</p>
-            <h2 className="charity-kpi-value charity-kpi-value-dark">{filteredStats.manualEntries}</h2>
-            <p className="charity-kpi-meta">Offline collections recorded by admin</p>
-          </div>
-        </Card>
+        ))}
       </div>
 
-      <Card className="mb-6">
-        <div className="charity-filter-bar">
-          <div className="charity-search">
-            <label htmlFor="charity-search">Search</label>
-            <div className="charity-search-input-wrap">
-              <Search size={16} className="charity-search-icon" />
+      {showManualForm && (
+        <section className="border-b border-slate-200 px-5 py-5">
+          <div className="mb-3 text-[11px] uppercase tracking-widest text-slate-500">Offline Donation</div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Field label="Donor Name">
               <input
-                id="charity-search"
-                type="text"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search donor or note"
+                className={inputClass}
+                value={form.donorName}
+                onChange={(event) => setForm((current) => ({ ...current, donorName: event.target.value }))}
+                placeholder="Community collection or donor name"
               />
-            </div>
+            </Field>
+            <Field label="Amount">
+              <input
+                className={inputClass}
+                type="number"
+                value={form.amount}
+                onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))}
+                placeholder="500"
+              />
+            </Field>
+            <Field label="Note" className="md:col-span-3">
+              <textarea
+                className={inputClass}
+                rows="3"
+                value={form.message}
+                onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))}
+                placeholder="Receipt note, campaign name, or collection details"
+              />
+            </Field>
           </div>
-          <div className="charity-filter-group">
-            <label>From</label>
-            <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+          <div className="mt-3 flex gap-2">
+            <Button variant="secondary" onClick={() => setShowManualForm(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateManualEntry} isLoading={saving}>
+              Save Entry
+            </Button>
           </div>
-          <div className="charity-filter-group">
-            <label>To</label>
-            <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
-          </div>
-          <div className="charity-filter-group">
-            <label>Source</label>
-            <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
+        </section>
+      )}
+
+      <section className="border-b border-slate-200 px-5 py-5">
+        <div className="grid gap-3 md:grid-cols-5">
+          <Field label="Search" className="md:col-span-2">
+            <input
+              className={inputClass}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search donor or note"
+            />
+          </Field>
+          <Field label="From">
+            <input className={inputClass} type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+          </Field>
+          <Field label="To">
+            <input className={inputClass} type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+          </Field>
+          <Field label="Source">
+            <select className={inputClass} value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
               {['ALL', 'APP', 'MANUAL'].map((value) => (
-                <option key={value} value={value}>{value}</option>
+                <option key={value} value={value}>
+                  {value}
+                </option>
               ))}
             </select>
-          </div>
-          <div className="charity-filter-actions">
-            <Button variant="secondary" onClick={clearFilters}>Reset Filters</Button>
-          </div>
+          </Field>
         </div>
-      </Card>
+        <div className="mt-3">
+          <Button variant="secondary" onClick={clearFilters}>
+            Reset Filters
+          </Button>
+        </div>
+      </section>
 
-      <Card>
-        <div className="charity-ledger-header">
-          <div>
-            <h3 className="section-title">Donation Ledger</h3>
-            <p className="text-muted mt-1">Showing {filteredDonations.length} donation records.</p>
-          </div>
-        </div>
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Donor</th>
-                <th>Source</th>
-                <th>Amount</th>
-                <th>Message</th>
-                <th>Date</th>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              <th className={tableHeaderClass}>Donor</th>
+              <th className={tableHeaderClass}>Source</th>
+              <th className={tableHeaderClass}>Amount</th>
+              <th className={tableHeaderClass}>Message</th>
+              <th className={tableHeaderClass}>Recorded By</th>
+              <th className={tableHeaderClass}>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredDonations.map((donation) => (
+              <tr key={donation.id}>
+                <td className={tableCellClass}>{donation.donorName}</td>
+                <td className={tableCellClass}>
+                  <Badge variant={(donation.entrySource || 'APP').toUpperCase() === 'MANUAL' ? 'amber' : 'blue'}>
+                    {(donation.entrySource || 'APP').toUpperCase()}
+                  </Badge>
+                </td>
+                <td className={`${tableCellClass} font-mono text-[12px]`}>{formatNPR(donation.amount)}</td>
+                <td className={tableCellClass}>{donation.message || '-'}</td>
+                <td className={tableCellClass}>{donation.recordedByName || '-'}</td>
+                <td className={`${tableCellClass} font-mono text-[12px]`}>
+                  {donation.createdAt ? format(new Date(donation.createdAt), 'yyyy-MM-dd HH:mm') : '-'}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {filteredDonations.map((donation) => (
-                <tr key={donation.id}>
-                  <td>
-                    <div className="font-bold">{donation.donorName}</div>
-                    {(donation.entrySource || 'APP').toUpperCase() === 'MANUAL' && donation.recordedByName && (
-                      <div className="text-sm text-muted mt-1">
-                        Recorded by {donation.recordedByName}
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    <Badge variant={SOURCE_VARIANTS[(donation.entrySource || 'APP').toUpperCase()] || 'gray'}>
-                      {(donation.entrySource || 'APP').toUpperCase()}
-                    </Badge>
-                  </td>
-                  <td>
-                    <Badge variant="success">{formatNPR(donation.amount)}</Badge>
-                  </td>
-                  <td className="text-muted">{donation.message || '-'}</td>
-                  <td className="text-sm">
-                    {donation.createdAt ? format(new Date(donation.createdAt), 'MMM dd, yyyy hh:mm a') : 'N/A'}
-                  </td>
-                </tr>
-              ))}
-              {filteredDonations.length === 0 && (
-                <tr>
-                  <td colSpan="5" className="text-center py-8 text-muted">
-                    No donations found for the selected filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {isManualOpen && createPortal((
-        <div className="charity-modal-overlay" onClick={() => setIsManualOpen(false)}>
-          <div className="charity-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="charity-modal-header">
-              <div>
-                <p className="charity-kpi-label">Offline Donation</p>
-                <h3 className="charity-modal-title">Add Manual Charity Entry</h3>
-              </div>
-              <button className="charity-modal-close" onClick={() => setIsManualOpen(false)}>
-                &times;
-              </button>
-            </div>
-            <div className="charity-modal-body">
-              <label>
-                Donor name
-                <input
-                  type="text"
-                  value={form.donorName}
-                  onChange={(event) => setForm((current) => ({ ...current, donorName: event.target.value }))}
-                  placeholder="Community collection, donor, or sponsor name"
-                />
-              </label>
-              <label>
-                Amount
-                <input
-                  type="number"
-                  value={form.amount}
-                  onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))}
-                  placeholder="500"
-                />
-              </label>
-              <label>
-                Note
-                <textarea
-                  rows="4"
-                  value={form.message}
-                  onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))}
-                  placeholder="Receipt note, campaign name, or collection details"
-                />
-              </label>
-              <div className="charity-modal-actions">
-                <Button variant="secondary" onClick={() => setIsManualOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCreateManualEntry} isLoading={saving}>
-                  Save Entry
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ), document.body)}
+            ))}
+            {filteredDonations.length === 0 && (
+              <tr>
+                <td colSpan="6" className="px-3 py-8 text-center text-[13px] text-slate-500">
+                  No donations found for the selected filters.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

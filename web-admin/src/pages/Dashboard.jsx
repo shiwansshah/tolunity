@@ -1,24 +1,42 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Banknote, Activity, Heart } from 'lucide-react';
 import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-  Legend,
-  CartesianGrid,
+  BarChart, Bar, PieChart, Pie, Cell,
+  ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
 import api from '../services/api';
-import { Card, PageHeader } from '../components/UI';
+import { Banner, PageHeader, tableCellClass, tableHeaderClass } from '../components/UI';
 import { getApiErrorMessage } from '../services/apiError';
-import './Dashboard.css';
 
-const PIE_COLORS = ['#4F46E5', '#10B981', '#F59E0B'];
+const CHART_COLORS = {
+  slate900: '#0f172a',
+  slate600: '#475569',
+  slate400: '#94a3b8',
+  emerald: '#059669',
+  amber: '#d97706',
+  red: '#dc2626',
+  blue: '#2563eb',
+};
+
+const PIE_COLORS = [CHART_COLORS.slate900, CHART_COLORS.blue, CHART_COLORS.slate400];
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-[12px] shadow-md">
+      {label && <div className="mb-1 font-medium text-slate-700">{label}</div>}
+      {payload.map((entry, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <span
+            className="inline-block h-2 w-2 rounded-sm"
+            style={{ backgroundColor: entry.color }}
+          />
+          <span className="text-slate-500">{entry.name}:</span>
+          <span className="font-mono font-medium text-slate-800">{entry.value?.toLocaleString('en-IN')}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
@@ -30,8 +48,8 @@ const Dashboard = () => {
       try {
         const response = await api.get('/admin/dashboard');
         setStats(response.data);
-      } catch (error) {
-        setError(getApiErrorMessage(error, 'Failed to fetch dashboard data'));
+      } catch (requestError) {
+        setError(getApiErrorMessage(requestError, 'Failed to fetch dashboard data'));
       } finally {
         setLoading(false);
       }
@@ -41,148 +59,261 @@ const Dashboard = () => {
   }, []);
 
   if (loading) {
-    return <div className="p-8 text-center text-muted">Loading analytics data...</div>;
-  }
-
-  if (error) {
-    return <div className="p-8 text-danger">{error}</div>;
+    return <div className="px-4 py-6 text-[13px] text-slate-500">Loading analytics data...</div>;
   }
 
   if (!stats) {
-    return null;
+    return <div className="px-4 py-6 text-[13px] text-slate-500">No dashboard data available.</div>;
   }
 
-  const userDistributionData = [
-    { name: 'Owners', value: stats.ownersCount },
-    { name: 'Tenants', value: stats.tenantsCount },
-    { name: 'Other', value: stats.totalUsers - stats.ownersCount - stats.tenantsCount },
-  ].filter((item) => item.value > 0);
+  const formatNPR = (amount) => `NPR ${(amount || 0).toLocaleString('en-IN')}`;
+  const otherUsers = Math.max(
+    0,
+    (stats.totalUsers || 0) - (stats.ownersCount || 0) - (stats.tenantsCount || 0)
+  );
+  const totalTrackedCapital = (stats.collectedRevenue || 0) + (stats.pendingRevenue || 0);
+  const tenantPerOwner =
+    stats.ownersCount > 0 ? (stats.tenantsCount / stats.ownersCount).toFixed(1) : '0.0';
 
-  const feeBreakdownData = [
-    { name: 'Maintenance', amount: stats.maintenanceCollected || 0, fill: '#F59E0B' },
-    { name: 'Garbage', amount: stats.garbageCollected || 0, fill: '#10B981' },
+  /* Chart data */
+  const revenueData = [
+    { name: 'Collected', value: stats.collectedRevenue || 0 },
+    { name: 'Pending', value: stats.pendingRevenue || 0 },
   ];
 
-  const formatNPR = (amount) => `NPR ${(amount || 0).toLocaleString('en-IN')}`;
+  const userMixData = [
+    { name: 'Owners', value: stats.ownersCount || 0 },
+    { name: 'Tenants', value: stats.tenantsCount || 0 },
+    { name: 'Other', value: otherUsers },
+  ].filter((d) => d.value > 0);
+
+  const feeData = [
+    { name: 'Maintenance', collected: stats.maintenanceCollected || 0 },
+    { name: 'Garbage', collected: stats.garbageCollected || 0 },
+  ];
+
+  const statCells = [
+    { label: 'Total Users', value: stats.totalUsers || 0, accent: '#0f172a' },
+    { label: 'Collected Revenue', value: formatNPR(stats.collectedRevenue), accent: '#059669' },
+    { label: 'Pending Revenue', value: formatNPR(stats.pendingRevenue), accent: '#d97706' },
+    { label: 'Charity Fund', value: formatNPR(stats.charityTotal), accent: '#2563eb' },
+  ];
 
   return (
-    <div className="fade-in">
-      <PageHeader
-        title="Admin Dashboard"
-        subtitle="Real-time overview of users, community fee collections, and charity fund"
-      />
+    <div className="text-[13px]">
+      <PageHeader eyebrow="Overview" title="Dashboard" />
 
-      <div className="kpi-grid">
-        <Card className="kpi-card">
-          <div className="kpi-icon gradient-primary">
-            <Users size={24} color="#FFF" />
-          </div>
-          <div className="kpi-info">
-            <p className="kpi-label">Total Users</p>
-            <h3 className="kpi-value">{stats.totalUsers}</h3>
-          </div>
-        </Card>
+      {error && <Banner>{error}</Banner>}
 
-        <Card className="kpi-card">
-          <div className="kpi-icon gradient-success">
-            <Banknote size={24} color="#FFF" />
+      {/* ── KPI Cards ── */}
+      <div className="grid gap-3 border-b border-slate-200 p-4 sm:grid-cols-2 xl:grid-cols-4">
+        {statCells.map(({ label, value, accent }) => (
+          <div
+            key={label}
+            className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3"
+            style={{ borderLeftColor: accent, borderLeftWidth: '3px' }}
+          >
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.1em] text-slate-500">{label}</div>
+              <div className="mt-1 text-[18px] font-semibold tracking-[-0.02em] text-slate-900">
+                {value}
+              </div>
+            </div>
           </div>
-          <div className="kpi-info">
-            <p className="kpi-label">Collected Revenue</p>
-            <h3 className="kpi-value text-success">{formatNPR(stats.collectedRevenue)}</h3>
-          </div>
-        </Card>
-
-        <Card className="kpi-card">
-          <div className="kpi-icon gradient-warning">
-            <Activity size={24} color="#FFF" />
-          </div>
-          <div className="kpi-info">
-            <p className="kpi-label">Pending Revenue</p>
-            <h3 className="kpi-value text-danger">{formatNPR(stats.pendingRevenue)}</h3>
-          </div>
-        </Card>
-
-        <Card className="kpi-card">
-          <div className="kpi-icon gradient-danger">
-            <Heart size={24} color="#FFF" />
-          </div>
-          <div className="kpi-info">
-            <p className="kpi-label">Charity Fund</p>
-            <h3 className="kpi-value text-charity">
-              {formatNPR(stats.charityTotal)}
-            </h3>
-          </div>
-        </Card>
+        ))}
       </div>
 
-      <div className="dashboard-grid mt-6">
-        <Card className="col-span-1">
-          <h3 className="section-title mb-6">User Distribution</h3>
-          <div style={{ height: 280 }}>
-            <ResponsiveContainer width="100%" height="100%">
+      {/* ── Charts Row ── */}
+      <div className="grid gap-px border-b border-slate-200 bg-slate-200 lg:grid-cols-3">
+        {/* Revenue Chart */}
+        <div className="bg-white p-4">
+          <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+            Revenue Breakdown
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={revenueData} barSize={36}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                axisLine={{ stroke: '#e2e8f0' }}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="value" name="Amount (NPR)" radius={[3, 3, 0, 0]}>
+                <Cell fill={CHART_COLORS.emerald} />
+                <Cell fill={CHART_COLORS.amber} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* User Mix Donut */}
+        <div className="bg-white p-4">
+          <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+            User Distribution
+          </div>
+          <div className="flex items-center justify-center">
+            <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie
-                  data={userDistributionData}
+                  data={userMixData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={55}
-                  outerRadius={90}
-                  paddingAngle={5}
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={2}
                   dataKey="value"
+                  stroke="none"
                 >
-                  {userDistributionData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                  {userMixData.map((_, i) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                   ))}
                 </Pie>
-                <RechartsTooltip />
-                <Legend layout="vertical" align="right" verticalAlign="middle" />
+                <Tooltip content={<CustomTooltip />} />
               </PieChart>
             </ResponsiveContainer>
           </div>
-        </Card>
-
-        <Card className="col-span-2">
-          <h3 className="section-title mb-6">Community Fee Collection Breakdown (Paid)</h3>
-          <div style={{ height: 280 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={feeBreakdownData} barSize={40}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                <XAxis dataKey="name" tick={{ fontSize: 13 }} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => `Rs ${value}`} />
-                <RechartsTooltip formatter={(value) => formatNPR(value)} />
-                <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
-                  {feeBreakdownData.map((entry, index) => (
-                    <Cell key={`bar-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      </div>
-
-      <Card className="mt-6">
-        <h3 className="section-title mb-6">System Health Report</h3>
-        <div className="stats-comparison">
-          <div className="stat-box border-r">
-            <p className="text-muted text-sm uppercase">Total Tracked Capital</p>
-            <h2 className="mt-1">
-              {formatNPR((stats.collectedRevenue || 0) + (stats.pendingRevenue || 0))}
-            </h2>
-          </div>
-          <div className="stat-box border-r">
-            <p className="text-muted text-sm uppercase">Tenants per Owner</p>
-            <h2 className="mt-1">
-              {stats.ownersCount > 0 ? (stats.tenantsCount / stats.ownersCount).toFixed(1) : 0}
-            </h2>
-          </div>
-          <div className="stat-box">
-            <p className="text-muted text-sm uppercase">Total Transactions</p>
-            <h2 className="mt-1">{stats.totalPayments}</h2>
+          {/* Legend */}
+          <div className="flex justify-center gap-4 pt-1">
+            {userMixData.map((d, i) => (
+              <div key={d.name} className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-sm"
+                  style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
+                />
+                {d.name} ({d.value})
+              </div>
+            ))}
           </div>
         </div>
-      </Card>
+
+        {/* Fee Collection Chart */}
+        <div className="bg-white p-4">
+          <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+            Fee Collection
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={feeData} layout="vertical" barSize={24}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+              <XAxis
+                type="number"
+                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
+              />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                axisLine={false}
+                tickLine={false}
+                width={85}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="collected" name="Collected (NPR)" fill={CHART_COLORS.slate900} radius={[0, 3, 3, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* ── Data Tables ── */}
+      <div className="grid gap-px border-b border-slate-200 bg-slate-200 xl:grid-cols-3">
+        <section className="bg-white">
+          <div className="border-b border-slate-200 px-4 py-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">User Mix</div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className={tableHeaderClass}>Type</th>
+                  <th className={tableHeaderClass}>Users</th>
+                  <th className={tableHeaderClass}>Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['Owners', stats.ownersCount || 0],
+                  ['Tenants', stats.tenantsCount || 0],
+                  ['Other', otherUsers],
+                ].map(([label, value]) => (
+                  <tr key={label}>
+                    <td className={tableCellClass}>{label}</td>
+                    <td className={`${tableCellClass} font-mono`}>{value}</td>
+                    <td className={`${tableCellClass} font-mono`}>
+                      {stats.totalUsers ? `${((Number(value) / stats.totalUsers) * 100).toFixed(1)}%` : '0.0%'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="bg-white">
+          <div className="border-b border-slate-200 px-4 py-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Fee Collection</div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className={tableHeaderClass}>Fee Type</th>
+                  <th className={tableHeaderClass}>Collected</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className={tableCellClass}>Maintenance</td>
+                  <td className={`${tableCellClass} font-mono`}>{formatNPR(stats.maintenanceCollected)}</td>
+                </tr>
+                <tr>
+                  <td className={tableCellClass}>Garbage</td>
+                  <td className={`${tableCellClass} font-mono`}>{formatNPR(stats.garbageCollected)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="bg-white">
+          <div className="border-b border-slate-200 px-4 py-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">System Metrics</div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className={tableHeaderClass}>Metric</th>
+                  <th className={tableHeaderClass}>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className={tableCellClass}>Total Tracked Capital</td>
+                  <td className={`${tableCellClass} font-mono`}>{formatNPR(totalTrackedCapital)}</td>
+                </tr>
+                <tr>
+                  <td className={tableCellClass}>Tenants per Owner</td>
+                  <td className={`${tableCellClass} font-mono`}>{tenantPerOwner}</td>
+                </tr>
+                <tr>
+                  <td className={tableCellClass}>Total Transactions</td>
+                  <td className={`${tableCellClass} font-mono`}>{stats.totalPayments || 0}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </div>
   );
 };

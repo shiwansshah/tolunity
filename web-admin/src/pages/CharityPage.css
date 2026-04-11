@@ -51,7 +51,7 @@
 .charity-hero-icon {
   width: 3.25rem;
   height: 3.25rem;
-  border-radius: 1rem;
+  border-radius: var(--radius-md);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -140,7 +140,7 @@
 .charity-modal-body textarea {
   width: 100%;
   border: 1px solid var(--border);
-  border-radius: 0.9rem;
+  border-radius: var(--radius-md);
   background: #fff;
   color: var(--text-main);
   padding: 0.85rem 0.95rem;
@@ -174,7 +174,7 @@
 .charity-modal {
   width: min(560px, 100%);
   background: #fff;
-  border-radius: 1.3rem;
+  border-radius: var(--radius-md);
   box-shadow: 0 32px 80px rgba(15, 23, 42, 0.28);
 }
 
@@ -198,7 +198,7 @@
   width: 2.5rem;
   height: 2.5rem;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: #f1f5f9;
   color: var(--text-main);
   font-size: 1.6rem;

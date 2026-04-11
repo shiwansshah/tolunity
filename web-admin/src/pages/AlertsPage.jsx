@@ -1,17 +1,25 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { TriangleAlert, Image as ImageIcon, Video } from 'lucide-react';
-import { PageHeader, Card, Badge, Button } from '../components/UI';
 import api from '../services/api';
 import { getApiErrorMessage } from '../services/apiError';
-import './AlertsPage.css';
+import {
+  Badge,
+  Banner,
+  Button,
+  Field,
+  PageHeader,
+  inputClass,
+  tableCellClass,
+  tableHeaderClass,
+} from '../components/UI';
 
-const toDataUrl = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(reader.result);
-  reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
-  reader.readAsDataURL(file);
-});
+const toDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+    reader.readAsDataURL(file);
+  });
 
 const mediaTypeForFile = (file) => (file.type?.startsWith('video/') ? 'VIDEO' : 'IMAGE');
 
@@ -19,23 +27,20 @@ const AlertsPage = () => {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+  const [message, setMessage] = useState(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [attachments, setAttachments] = useState([]);
 
-  const unreadCount = useMemo(
-    () => alerts.filter((alert) => !alert.isRead).length,
-    [alerts]
-  );
+  const unreadCount = useMemo(() => alerts.filter((alert) => !alert.isRead).length, [alerts]);
 
   const fetchAlerts = useCallback(async () => {
     try {
-      setError(null);
       const response = await api.get('/alerts');
       setAlerts(Array.isArray(response.data) ? response.data : []);
+      setMessage(null);
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'Failed to load alerts'));
+      setMessage({ tone: 'error', text: getApiErrorMessage(requestError, 'Failed to load alerts') });
     } finally {
       setLoading(false);
     }
@@ -52,16 +57,17 @@ const AlertsPage = () => {
     }
 
     try {
-      const nextAttachments = await Promise.all(files.map(async (file) => ({
-        id: `${file.name}-${file.lastModified}`,
-        fileName: file.name,
-        mediaType: mediaTypeForFile(file),
-        mediaUrl: await toDataUrl(file),
-      })));
-
+      const nextAttachments = await Promise.all(
+        files.map(async (file) => ({
+          id: `${file.name}-${file.lastModified}`,
+          fileName: file.name,
+          mediaType: mediaTypeForFile(file),
+          mediaUrl: await toDataUrl(file),
+        }))
+      );
       setAttachments((current) => [...current, ...nextAttachments]);
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'Failed to prepare selected files'));
+      setMessage({ tone: 'error', text: getApiErrorMessage(requestError, 'Failed to prepare selected files') });
     } finally {
       event.target.value = '';
     }
@@ -73,25 +79,24 @@ const AlertsPage = () => {
 
   const submitAlert = async () => {
     if (!title.trim() || !description.trim()) {
-      setError('Title and description are required.');
+      setMessage({ tone: 'error', text: 'Title and description are required.' });
       return;
     }
 
     setSaving(true);
-    setError(null);
     try {
       await api.post('/alerts', {
         title: title.trim(),
         description: description.trim(),
         mediaList: attachments.map(({ mediaType, mediaUrl }) => ({ mediaType, mediaUrl })),
       });
-
       setTitle('');
       setDescription('');
       setAttachments([]);
+      setMessage({ tone: 'success', text: 'Alert broadcasted.' });
       await fetchAlerts();
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'Failed to broadcast alert'));
+      setMessage({ tone: 'error', text: getApiErrorMessage(requestError, 'Failed to broadcast alert') });
     } finally {
       setSaving(false);
     }
@@ -100,153 +105,153 @@ const AlertsPage = () => {
   const markAsRead = async (alertId) => {
     try {
       await api.put(`/alerts/${alertId}/read`);
+      setMessage({ tone: 'success', text: `Alert #${alertId} marked as read.` });
       await fetchAlerts();
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'Failed to update alert status'));
+      setMessage({ tone: 'error', text: getApiErrorMessage(requestError, 'Failed to update alert status') });
     }
   };
 
   const markAllAsRead = async () => {
     try {
       await api.put('/alerts/read-all');
+      setMessage({ tone: 'success', text: 'All alerts marked as read.' });
       await fetchAlerts();
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'Failed to update alerts'));
+      setMessage({ tone: 'error', text: getApiErrorMessage(requestError, 'Failed to update alerts') });
     }
   };
 
+  if (loading) {
+    return <div className="px-3 py-4 text-[13px] text-slate-500">Loading alerts...</div>;
+  }
+
   return (
-    <div className="fade-in">
+    <div className="text-[13px]">
       <PageHeader
+        eyebrow="Broadcast"
         title="Emergency Alerts"
-        subtitle="Broadcast urgent incidents to the entire society. Push notifications only contain the title and description."
-        action={unreadCount > 0 ? <Button variant="secondary" onClick={markAllAsRead}>Mark All Read</Button> : null}
+        subtitle="Create broadcast alerts with optional media and manage unread status."
+        actions={
+          unreadCount > 0 ? (
+            <Button variant="secondary" onClick={markAllAsRead}>
+              Mark All Read
+            </Button>
+          ) : null
+        }
       />
 
-      {error && <div className="alert-banner alert-banner-error">{error}</div>}
+      {message && <Banner tone={message.tone}>{message.text}</Banner>}
 
-      <div className="alerts-grid">
-        <Card className="alert-compose-card">
-          <div className="compose-header">
-            <div>
-              <h3>Raise Alert</h3>
-              <p>Use this only for emergencies. Attach images or videos when they help residents respond faster.</p>
-            </div>
-            <Badge variant="danger">Emergency</Badge>
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="alert-title">Title</label>
+      <section className="border-b border-slate-200 px-5 py-5">
+        <div className="mb-3 text-[11px] uppercase tracking-widest text-slate-500">Create Alert</div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="Title" className="md:col-span-2">
             <input
-              id="alert-title"
-              type="text"
+              className={inputClass}
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Fire in Block B"
             />
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="alert-description">Description</label>
+          </Field>
+          <Field label="Description" className="md:col-span-2">
             <textarea
-              id="alert-description"
-              rows="5"
+              className={inputClass}
+              rows="4"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="Describe the emergency, exact location, and any immediate safety instruction."
+              placeholder="Describe the emergency, location, and immediate instruction."
             />
+          </Field>
+          <Field label="Media Files" className="md:col-span-2">
+            <input className={inputClass} type="file" accept="image/*,video/*" multiple onChange={handleFilesSelected} />
+          </Field>
+        </div>
+
+        {attachments.length > 0 && (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className={tableHeaderClass}>Type</th>
+                  <th className={tableHeaderClass}>File</th>
+                  <th className={tableHeaderClass}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {attachments.map((attachment) => (
+                  <tr key={attachment.id}>
+                    <td className={tableCellClass}>
+                      <Badge variant={attachment.mediaType === 'VIDEO' ? 'amber' : 'blue'}>
+                        {attachment.mediaType}
+                      </Badge>
+                    </td>
+                    <td className={tableCellClass}>{attachment.fileName}</td>
+                    <td className={tableCellClass}>
+                      <Button variant="secondary" onClick={() => removeAttachment(attachment.id)}>
+                        Remove
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+        )}
 
-          <div className="form-field">
-            <label htmlFor="alert-files">Photos / Videos</label>
-            <input
-              id="alert-files"
-              type="file"
-              accept="image/*,video/*"
-              multiple
-              onChange={handleFilesSelected}
-            />
-          </div>
+        <div className="mt-3">
+          <Button onClick={submitAlert} isLoading={saving}>
+            Broadcast Alert
+          </Button>
+        </div>
+      </section>
 
-          {attachments.length > 0 && (
-            <div className="attachment-list">
-              {attachments.map((attachment) => (
-                <div key={attachment.id} className="attachment-chip">
-                  <span>{attachment.mediaType === 'VIDEO' ? 'Video' : 'Image'}: {attachment.fileName}</span>
-                  <button type="button" onClick={() => removeAttachment(attachment.id)}>Remove</button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="compose-actions">
-            <Button onClick={submitAlert} isLoading={saving}>
-              Broadcast Alert
-            </Button>
-          </div>
-        </Card>
-
-        <div className="alert-feed">
-          {loading ? (
-            <Card>
-              <div className="text-center p-8 text-muted">Loading alerts...</div>
-            </Card>
-          ) : alerts.length === 0 ? (
-            <Card>
-              <div className="empty-alerts">
-                <TriangleAlert size={40} />
-                <p>No emergency alerts have been raised.</p>
-              </div>
-            </Card>
-          ) : (
-            alerts.map((alert) => (
-              <Card key={alert.id} className={`alert-item ${alert.isRead ? '' : 'alert-item-unread'}`}>
-                <div className="alert-item-top">
-                  <div>
-                    <div className="alert-kicker-row">
-                      <Badge variant="danger">Alert</Badge>
-                      {!alert.isRead && <Badge variant="warning">Unread</Badge>}
-                    </div>
-                    <h3>{alert.title}</h3>
-                    <p className="alert-meta">
-                      Raised by {alert.createdByName} on {alert.createdAt ? format(new Date(alert.createdAt), 'MMM dd, yyyy hh:mm a') : 'N/A'}
-                    </p>
-                  </div>
-                  {!alert.isRead && (
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              <th className={tableHeaderClass}>Title</th>
+              <th className={tableHeaderClass}>Raised By</th>
+              <th className={tableHeaderClass}>Created At</th>
+              <th className={tableHeaderClass}>Media</th>
+              <th className={tableHeaderClass}>Status</th>
+              <th className={tableHeaderClass}>Description</th>
+              <th className={tableHeaderClass}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {alerts.map((alert) => (
+              <tr key={alert.id}>
+                <td className={tableCellClass}>{alert.title}</td>
+                <td className={tableCellClass}>{alert.createdByName || '-'}</td>
+                <td className={`${tableCellClass} font-mono text-[12px]`}>
+                  {alert.createdAt ? format(new Date(alert.createdAt), 'yyyy-MM-dd HH:mm') : '-'}
+                </td>
+                <td className={`${tableCellClass} font-mono text-[12px]`}>{alert.mediaList?.length || 0}</td>
+                <td className={tableCellClass}>
+                  <Badge variant={alert.isRead ? 'slate' : 'red'}>{alert.isRead ? 'READ' : 'UNREAD'}</Badge>
+                </td>
+                <td className={tableCellClass}>{alert.description}</td>
+                <td className={tableCellClass}>
+                  {!alert.isRead ? (
                     <Button variant="secondary" onClick={() => markAsRead(alert.id)}>
                       Mark Read
                     </Button>
+                  ) : (
+                    '-'
                   )}
-                </div>
-
-                <p className="alert-description">{alert.description}</p>
-
-                {alert.mediaList?.length > 0 && (
-                  <div className="alert-media-grid">
-                    {alert.mediaList.map((media) => (
-                      <div key={media.id} className="alert-media-card">
-                        {media.mediaType === 'VIDEO' ? (
-                          <div className="alert-media-placeholder">
-                            <Video size={18} />
-                            <span>Video attached</span>
-                          </div>
-                        ) : (
-                          <>
-                            <img src={media.mediaUrl} alt={`${alert.title} attachment`} />
-                            <div className="alert-media-label">
-                              <ImageIcon size={14} />
-                              <span>Image attached</span>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-            ))
-          )}
-        </div>
+                </td>
+              </tr>
+            ))}
+            {alerts.length === 0 && (
+              <tr>
+                <td colSpan="7" className="px-3 py-8 text-center text-[13px] text-slate-500">
+                  No emergency alerts have been raised.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

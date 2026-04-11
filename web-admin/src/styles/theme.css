@@ -1,115 +1,49 @@
 :root {
-  --primary: #1f4e8c;
-  --primary-hover: #173f72;
-  --primary-soft: #e9f0f9;
-  --secondary: #5f6b7a;
+  /* ── Brand ── */
+  --brand: #2563eb;
+  --brand-hover: #1d4ed8;
+  --brand-soft: #eff6ff;
 
-  --background: #f4f6f9;
+  /* ── Slate palette ── */
+  --slate-50: #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+
+  /* ── Semantic aliases ── */
+  --background: var(--slate-100);
   --surface: #ffffff;
-  --surface-hover: #f8fafc;
-  --surface-subtle: #f7f9fc;
-  --sidebar-bg: #ffffff;
-  --topbar-bg: rgba(255, 255, 255, 0.94);
+  --surface-subtle: var(--slate-50);
+  --border: var(--slate-200);
+  --border-strong: var(--slate-300);
+  --text-main: var(--slate-700);
+  --text-strong: var(--slate-900);
+  --text-muted: var(--slate-500);
 
-  --text-main: #223046;
-  --text-strong: #152033;
-  --text-muted: #6b778c;
-  --border: #d9e1eb;
-  --border-strong: #c7d2df;
+  /* ── Status colors ── */
+  --success: #059669;
+  --danger: #dc2626;
+  --warning: #d97706;
 
-  --success: #1f8a56;
-  --success-bg: #e6f5ec;
-  --warning: #a66916;
-  --warning-bg: #fff3dd;
-  --danger: #c84a44;
-  --danger-bg: #fbe9e8;
+  /* ── Typography ── */
+  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 10px 24px rgba(31, 48, 70, 0.08);
-  --shadow-xl: 0 20px 44px rgba(31, 48, 70, 0.1);
-  --glass-bg: #ffffff;
-  --glass-border: var(--border);
+  /* ── Radii ── */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
 
-  --radius-sm: 0.625rem;
-  --radius-md: 0.875rem;
-  --radius-lg: 1.125rem;
-  --radius-xl: 1.5rem;
+  /* ── Shadows ── */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
 
-  --font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --transition: all 0.18s ease;
-}
-
-html,
-body {
-  min-height: 100%;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  background:
-    radial-gradient(circle at top right, rgba(31, 78, 140, 0.06), transparent 22%),
-    linear-gradient(180deg, #f7f9fc 0%, #f2f5f9 100%);
-  color: var(--text-main);
-  font-family: var(--font-family);
-  -webkit-font-smoothing: antialiased;
-}
-
-.glass-panel {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-md);
-  border-radius: var(--radius-lg);
-}
-
-.premium-btn {
-  min-height: 2.75rem;
-  padding: 0.75rem 1.1rem;
-  background-color: var(--primary);
-  color: #fff;
-  border: 1px solid var(--primary);
-  border-radius: var(--radius-sm);
-  font-weight: 700;
-  font-size: 0.92rem;
-  cursor: pointer;
-  transition: var(--transition);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  box-shadow: 0 6px 16px rgba(31, 78, 140, 0.18);
-}
-
-.premium-btn:hover:not(:disabled) {
-  background-color: var(--primary-hover);
-  border-color: var(--primary-hover);
-  box-shadow: 0 10px 22px rgba(31, 78, 140, 0.14);
-}
-
-.premium-btn:focus-visible {
-  outline: 0;
-  box-shadow: 0 0 0 4px rgba(31, 78, 140, 0.15);
-}
-
-.premium-btn:disabled {
-  opacity: 0.68;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.fade-in {
-  animation: fadeIn 0.28s ease-out forwards;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  /* ── Transitions ── */
+  --transition: 150ms ease;
 }

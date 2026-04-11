@@ -1,10 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Activity, Search } from 'lucide-react';
-import { PageHeader, Card, Badge } from '../components/UI';
+import { Download, Filter, RefreshCw } from 'lucide-react';
 import api from '../services/api';
 import { getApiErrorMessage } from '../services/apiError';
-import './PaymentsReportPage.css';
+import {
+  Badge,
+  Banner,
+  PageHeader,
+  ToolbarIconButton,
+  inputClass,
+  tableCellClass,
+  tableHeaderClass,
+} from '../components/UI';
+
+const ACTION_BADGE = {
+  CREATE: 'green',
+  UPDATE: 'amber',
+  DELETE: 'red',
+};
 
 const ActivityLogPage = () => {
   const [logs, setLogs] = useState([]);
@@ -12,129 +25,162 @@ const ActivityLogPage = () => {
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState('ALL');
   const [error, setError] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get('/admin/audit-logs');
+      setLogs(Array.isArray(response.data) ? response.data : []);
+      setError(null);
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'Failed to load activity log'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        const response = await api.get('/admin/audit-logs');
-        setLogs(Array.isArray(response.data) ? response.data : []);
-      } catch (requestError) {
-        setError(getApiErrorMessage(requestError, 'Failed to load activity log'));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLogs();
+    load();
   }, []);
 
-  const actions = useMemo(() => ['ALL', ...new Set(logs.map((log) => log.actionType).filter(Boolean))], [logs]);
+  const actions = useMemo(
+    () => ['ALL', ...new Set(logs.map((log) => log.actionType).filter(Boolean))],
+    [logs]
+  );
 
-  const filteredLogs = useMemo(() => logs.filter((log) => {
-    const normalizedSearch = search.trim().toLowerCase();
-    const actionMatch = actionFilter === 'ALL' || log.actionType === actionFilter;
-    const searchMatch = !normalizedSearch || [
-      log.actorName,
-      log.summary,
-      log.details,
-      log.targetType,
-    ].some((value) => value?.toLowerCase().includes(normalizedSearch));
+  const filteredLogs = useMemo(
+    () =>
+      logs.filter((log) => {
+        const query = search.trim().toLowerCase();
+        const actionMatch = actionFilter === 'ALL' || log.actionType === actionFilter;
+        const queryMatch =
+          !query ||
+          [log.actorName, log.summary, log.details, log.targetType]
+            .some((value) => value?.toLowerCase().includes(query));
+        return actionMatch && queryMatch;
+      }),
+    [logs, search, actionFilter]
+  );
 
-    return actionMatch && searchMatch;
-  }), [logs, search, actionFilter]);
+  const exportCSV = () => {
+    const header = 'Timestamp,Actor,ActorID,Action,Target,TargetID,Summary';
+    const lines = filteredLogs.map((log) =>
+      [
+        log.createdAt ? format(new Date(log.createdAt), 'yyyy-MM-dd HH:mm:ss') : '',
+        `"${log.actorName || 'System'}"`,
+        log.actorId || '',
+        log.actionType || '',
+        log.targetType || '',
+        log.targetId || '',
+        `"${(log.summary || '').replace(/"/g, '""')}"`,
+      ].join(',')
+    );
+    const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' });
+    const link = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(blob),
+      download: `activity_${format(new Date(), 'yyyyMMdd')}.csv`,
+    });
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
 
   if (loading) {
-    return <div className="p-8 text-center text-muted">Loading activity log...</div>;
+    return <div className="px-3 py-4 text-[13px] text-slate-500">Loading activity log...</div>;
   }
 
   return (
-    <div className="fade-in">
+    <div className="text-[13px]">
       <PageHeader
+        eyebrow="System"
         title="Activity Log"
-        subtitle="Every admin-side update is recorded here with the acting user, target, and change summary."
+        subtitle="Audit actor activity, target records, and change summaries."
       />
 
-      {error && <div className="alert-banner alert-error">{error}</div>}
+      {error && <Banner>{error}</Banner>}
 
-      <Card className="mb-6">
-        <div className="transaction-filter-bar">
-          <div className="transaction-search">
-            <label htmlFor="audit-search">Search</label>
-            <div style={{ position: 'relative' }}>
-              <Search size={16} style={{ position: 'absolute', left: 14, top: 15, color: 'var(--text-muted)' }} />
-              <input
-                id="audit-search"
-                type="text"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search actor, summary, or details"
-                style={{ paddingLeft: '2.5rem' }}
-              />
-            </div>
-          </div>
-          <div className="transaction-filter-group">
-            <label>Action Type</label>
-            <select value={actionFilter} onChange={(event) => setActionFilter(event.target.value)}>
+      <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-4">
+        <div className="w-full max-w-xs">
+          <input
+            className={inputClass}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search actor, target, or summary"
+          />
+        </div>
+        <div className="font-mono text-[12px] text-slate-500">{filteredLogs.length} entries</div>
+        <div className="ml-auto flex items-center gap-1">
+          <ToolbarIconButton title="Filter" onClick={() => setShowFilters((current) => !current)} active={showFilters}>
+            <Filter className="h-4 w-4 stroke-[1.5]" />
+          </ToolbarIconButton>
+          <ToolbarIconButton title="Export" onClick={exportCSV}>
+            <Download className="h-4 w-4 stroke-[1.5]" />
+          </ToolbarIconButton>
+          <ToolbarIconButton title="Refresh" onClick={load}>
+            <RefreshCw className="h-4 w-4 stroke-[1.5]" />
+          </ToolbarIconButton>
+        </div>
+      </div>
+
+      {showFilters && (
+        <div className="border-b border-slate-200 px-5 py-4">
+          <div className="w-full max-w-[220px]">
+            <div className="mb-1 text-[11px] uppercase tracking-widest text-slate-500">Action Type</div>
+            <select className={inputClass} value={actionFilter} onChange={(event) => setActionFilter(event.target.value)}>
               {actions.map((value) => (
-                <option key={value} value={value}>{value}</option>
+                <option key={value} value={value}>
+                  {value}
+                </option>
               ))}
             </select>
           </div>
         </div>
-      </Card>
+      )}
 
-      <Card>
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Timestamp</th>
-                <th>Actor</th>
-                <th>Action</th>
-                <th>Target</th>
-                <th>Summary</th>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              <th className={tableHeaderClass}>Timestamp</th>
+              <th className={tableHeaderClass}>Actor</th>
+              <th className={tableHeaderClass}>Actor ID</th>
+              <th className={tableHeaderClass}>Action</th>
+              <th className={tableHeaderClass}>Target</th>
+              <th className={tableHeaderClass}>Target ID</th>
+              <th className={tableHeaderClass}>Summary</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredLogs.map((log) => (
+              <tr key={log.id}>
+                <td className={`${tableCellClass} font-mono text-[12px]`}>
+                  {log.createdAt ? format(new Date(log.createdAt), 'yyyy-MM-dd HH:mm:ss') : '-'}
+                </td>
+                <td className={tableCellClass}>{log.actorName || 'System'}</td>
+                <td className={`${tableCellClass} font-mono text-[12px]`}>{log.actorId || '-'}</td>
+                <td className={tableCellClass}>
+                  <Badge variant={ACTION_BADGE[log.actionType?.toUpperCase()] || 'slate'}>
+                    {log.actionType || 'UNKNOWN'}
+                  </Badge>
+                </td>
+                <td className={tableCellClass}>{log.targetType || '-'}</td>
+                <td className={`${tableCellClass} font-mono text-[12px]`}>{log.targetId || '-'}</td>
+                <td className={tableCellClass}>
+                  <div>{log.summary || '-'}</div>
+                  {log.details && <div className="mt-1 text-[12px] text-slate-500">{log.details}</div>}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {filteredLogs.map((log) => (
-                <tr key={log.id}>
-                  <td>
-                    <div className="font-bold">{log.createdAt ? format(new Date(log.createdAt), 'MMM dd, yyyy') : 'N/A'}</div>
-                    <div className="text-sm text-muted mt-1">{log.createdAt ? format(new Date(log.createdAt), 'hh:mm a') : ''}</div>
-                  </td>
-                  <td>
-                    <div className="font-bold">{log.actorName || 'System'}</div>
-                    <div className="text-sm text-muted mt-1">ID: {log.actorId || 'N/A'}</div>
-                  </td>
-                  <td>
-                    <Badge variant="primary">{log.actionType || 'UNKNOWN'}</Badge>
-                  </td>
-                  <td>
-                    <div className="font-bold">{log.targetType || 'N/A'}</div>
-                    <div className="text-sm text-muted mt-1">ID: {log.targetId || 'N/A'}</div>
-                  </td>
-                  <td>
-                    <div className="flex items-start gap-2">
-                      <Activity size={16} style={{ color: 'var(--primary)', marginTop: 2 }} />
-                      <div>
-                        <div className="font-bold">{log.summary}</div>
-                        {log.details && <div className="text-sm text-muted mt-1">{log.details}</div>}
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredLogs.length === 0 && (
-                <tr>
-                  <td colSpan="5" className="text-center py-8 text-muted">
-                    No activity entries match the current filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+            ))}
+            {filteredLogs.length === 0 && (
+              <tr>
+                <td colSpan="7" className="px-3 py-8 text-center text-[13px] text-slate-500">
+                  No entries match the current filters.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

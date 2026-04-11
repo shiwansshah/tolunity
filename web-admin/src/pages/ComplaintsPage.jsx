@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { PageHeader, Card, Badge, Button } from '../components/UI';
 import api from '../services/api';
 import { getApiErrorMessage } from '../services/apiError';
+import { Badge, Banner, Button, PageHeader, inputClass, tableCellClass, tableHeaderClass } from '../components/UI';
 
 const STATUS_OPTIONS = ['OPEN', 'UNDER_REVIEW', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
 const STATUS_COLORS = {
-  OPEN: 'warning',
-  UNDER_REVIEW: 'primary',
-  IN_PROGRESS: 'primary',
-  RESOLVED: 'success',
-  CLOSED: 'gray',
+  OPEN: 'amber',
+  UNDER_REVIEW: 'blue',
+  IN_PROGRESS: 'blue',
+  RESOLVED: 'green',
+  CLOSED: 'slate',
 };
 
 const ComplaintsPage = () => {
@@ -18,7 +18,7 @@ const ComplaintsPage = () => {
   const [drafts, setDrafts] = useState({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
-  const [error, setError] = useState(null);
+  const [message, setMessage] = useState(null);
 
   const fetchComplaints = async () => {
     try {
@@ -26,16 +26,17 @@ const ComplaintsPage = () => {
       const rows = Array.isArray(response.data) ? response.data : [];
       setComplaints(rows);
       setDrafts(
-        rows.reduce((acc, complaint) => {
-          acc[complaint.id] = {
+        rows.reduce((accumulator, complaint) => {
+          accumulator[complaint.id] = {
             status: complaint.status || 'OPEN',
             resolutionNote: complaint.resolutionNote || '',
           };
-          return acc;
+          return accumulator;
         }, {})
       );
+      setMessage(null);
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'Failed to load complaints'));
+      setMessage({ tone: 'error', text: getApiErrorMessage(requestError, 'Failed to load complaints') });
     } finally {
       setLoading(false);
     }
@@ -56,112 +57,118 @@ const ComplaintsPage = () => {
   };
 
   const saveComplaint = async (complaintId) => {
-    const draft = drafts[complaintId];
     setSavingId(complaintId);
     try {
-      await api.put(`/admin/complaints/${complaintId}/status`, draft);
+      await api.put(`/admin/complaints/${complaintId}/status`, drafts[complaintId]);
+      setMessage({ tone: 'success', text: `Complaint #${complaintId} updated.` });
       await fetchComplaints();
     } catch (requestError) {
-      alert(getApiErrorMessage(requestError, 'Failed to update complaint'));
+      setMessage({ tone: 'error', text: getApiErrorMessage(requestError, 'Failed to update complaint') });
     } finally {
       setSavingId(null);
     }
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-muted">Loading complaints...</div>;
+    return <div className="px-3 py-4 text-[13px] text-slate-500">Loading complaints...</div>;
   }
 
   return (
-    <div className="fade-in">
+    <div className="text-[13px]">
       <PageHeader
-        title="Complaint Management"
-        subtitle="Community complaints ranked by upvotes so common issues surface first"
+        eyebrow="Cases"
+        title="Complaints"
+        subtitle="Track complaint volume, review supporting context, and update case status."
       />
 
-      {error && <div className="error-banner">{error}</div>}
+      {message && <Banner tone={message.tone}>{message.text}</Banner>}
 
-      <Card>
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Complaint</th>
-                <th>Reporter</th>
-                <th>Upvotes</th>
-                <th>Status</th>
-                <th>Follow Up</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {complaints.map((complaint) => {
-                const draft = drafts[complaint.id] || { status: complaint.status, resolutionNote: complaint.resolutionNote };
-                const contact = complaint.followUpContact || {};
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              <th className={tableHeaderClass}>Complaint</th>
+              <th className={tableHeaderClass}>Reporter</th>
+              <th className={tableHeaderClass}>Votes</th>
+              <th className={tableHeaderClass}>Status</th>
+              <th className={tableHeaderClass}>Follow Up</th>
+              <th className={tableHeaderClass}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {complaints.map((complaint) => {
+              const draft = drafts[complaint.id] || {
+                status: complaint.status || 'OPEN',
+                resolutionNote: complaint.resolutionNote || '',
+              };
+              const contact = complaint.followUpContact || {};
 
-                return (
-                  <tr key={complaint.id}>
-                    <td>
-                      <div className="font-bold">{complaint.title}</div>
-                      <div className="text-sm text-muted mt-1">{complaint.category}</div>
-                      <div className="text-sm mt-2">{complaint.description}</div>
-                      <div className="text-sm text-muted mt-2">
-                        {complaint.createdAt ? format(new Date(complaint.createdAt), 'MMM dd, yyyy hh:mm a') : 'N/A'}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="font-bold">{complaint.createdByName}</div>
-                      <div className="text-sm text-muted">ID: {complaint.createdById}</div>
-                    </td>
-                    <td>
-                      <div className="font-bold">{complaint.upvoteCount}</div>
-                      <div className="text-sm text-muted">{complaint.mediaList?.length || 0} media</div>
-                    </td>
-                    <td style={{ minWidth: 220 }}>
-                      <Badge variant={STATUS_COLORS[complaint.status] || 'gray'}>{complaint.status}</Badge>
-                      <select
-                        value={draft.status || 'OPEN'}
-                        onChange={(event) => updateDraft(complaint.id, 'status', event.target.value)}
-                        style={{ width: '100%', marginTop: 12 }}
-                      >
-                        {STATUS_OPTIONS.map((status) => (
-                          <option key={status} value={status}>
-                            {status}
-                          </option>
-                        ))}
-                      </select>
-                      <textarea
-                        value={draft.resolutionNote || ''}
-                        onChange={(event) => updateDraft(complaint.id, 'resolutionNote', event.target.value)}
-                        rows={4}
-                        style={{ width: '100%', marginTop: 12 }}
-                        placeholder="Add an internal/public progress note"
-                      />
-                    </td>
-                    <td>
-                      <div className="text-sm">{contact.name || 'Complaint Desk'}</div>
-                      <div className="text-sm text-muted">{contact.phoneNumber}</div>
-                      <div className="text-sm text-muted">{contact.email}</div>
-                    </td>
-                    <td>
-                      <Button onClick={() => saveComplaint(complaint.id)} isLoading={savingId === complaint.id}>
-                        Save Update
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {complaints.length === 0 && (
-                <tr>
-                  <td colSpan="6" className="text-center py-8 text-muted">
-                    No complaints found
+              return (
+                <tr key={complaint.id}>
+                  <td className={tableCellClass}>
+                    <div className="font-semibold text-slate-900">{complaint.title}</div>
+                    <div className="mt-1 text-[12px] text-slate-500">{complaint.category || '-'}</div>
+                    <div className="mt-1">{complaint.description || '-'}</div>
+                    <div className="mt-1 font-mono text-[12px] text-slate-500">
+                      {complaint.createdAt ? format(new Date(complaint.createdAt), 'yyyy-MM-dd HH:mm') : '-'}
+                    </div>
+                  </td>
+                  <td className={tableCellClass}>
+                    <div>{complaint.createdByName || '-'}</div>
+                    <div className="mt-1 font-mono text-[12px] text-slate-500">#{complaint.createdById || '-'}</div>
+                  </td>
+                  <td className={tableCellClass}>
+                    <div className="font-mono text-[12px]">{complaint.upvoteCount || 0}</div>
+                    <div className="mt-1 text-[12px] text-slate-500">{complaint.mediaList?.length || 0} media</div>
+                  </td>
+                  <td className={tableCellClass}>
+                    <div className="mb-2">
+                      <Badge variant={STATUS_COLORS[complaint.status] || 'slate'}>
+                        {complaint.status || 'UNKNOWN'}
+                      </Badge>
+                    </div>
+                    <select
+                      className={inputClass}
+                      value={draft.status || 'OPEN'}
+                      onChange={(event) => updateDraft(complaint.id, 'status', event.target.value)}
+                    >
+                      {STATUS_OPTIONS.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                    <textarea
+                      className={`${inputClass} mt-2`}
+                      rows="3"
+                      value={draft.resolutionNote || ''}
+                      onChange={(event) => updateDraft(complaint.id, 'resolutionNote', event.target.value)}
+                      placeholder="Add an internal or public progress note"
+                    />
+                  </td>
+                  <td className={tableCellClass}>
+                    <div>{contact.name || 'Complaint Desk'}</div>
+                    <div className="mt-1 font-mono text-[12px] text-slate-500">{contact.phoneNumber || '-'}</div>
+                    <div className="mt-1 font-mono text-[12px] text-slate-500">{contact.email || '-'}</div>
+                  </td>
+                  <td className={tableCellClass}>
+                    <Button onClick={() => saveComplaint(complaint.id)} isLoading={savingId === complaint.id}>
+                      Save Update
+                    </Button>
                   </td>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+              );
+            })}
+            {complaints.length === 0 && (
+              <tr>
+                <td colSpan="6" className="px-3 py-8 text-center text-[13px] text-slate-500">
+                  No complaints found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

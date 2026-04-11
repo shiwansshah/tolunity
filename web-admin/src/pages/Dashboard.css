@@ -1,59 +1,15 @@
+/* Dashboard-specific styles — kept minimal since most styling is inline Tailwind */
+
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
 }
-
-.kpi-card {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.5rem;
-}
-
-.kpi-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--shadow-sm);
-}
-
-.gradient-primary { background: #2b5d9a; }
-.gradient-success { background: #2a9361; }
-.gradient-warning { background: #bf7c25; }
-.gradient-danger { background: #bf4c56; }
-
-.kpi-info {
-  flex: 1;
-}
-
-.kpi-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.25rem;
-}
-
-.kpi-value {
-  font-size: 1.75rem;
-  font-weight: 800;
-  color: var(--text-strong);
-  line-height: 1;
-}
-
-.text-success { color: var(--success); }
-.text-danger { color: var(--danger); }
-.text-charity { color: #b34550; }
 
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1fr 2fr;
-  gap: 1.5rem;
+  gap: 1px;
 }
 
 @media (max-width: 1024px) {
@@ -63,45 +19,9 @@
 }
 
 .section-title {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--text-strong);
-}
-
-.report-alert {
-  padding: 1.25rem;
-  background: rgba(31, 138, 86, 0.1);
-  border-color: rgba(31, 138, 86, 0.22);
-}
-
-.stats-comparison {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  background: var(--surface-subtle);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 1.25rem;
-  margin-top: 1.5rem;
-}
-
-.stat-box {
-  padding: 0.5rem 1rem;
-}
-
-.border-r {
-  border-right: 1px solid var(--border);
-}
-
-.text-sm { font-size: 0.8rem; }
-.uppercase { text-transform: uppercase; letter-spacing: 0.05em; }
-
-@media (max-width: 768px) {
-  .stats-comparison {
-    grid-template-columns: 1fr;
-  }
-
-  .border-r {
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
-  }
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--slate-500);
 }

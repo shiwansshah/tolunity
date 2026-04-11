@@ -4,7 +4,6 @@ import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/useAuth';
 import AdminLayout from './layouts/AdminLayout';
 
-// Pages to be created
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import UsersPage from './pages/UsersPage';
@@ -19,11 +18,15 @@ import AboutTolUnityPage from './pages/AboutTolUnityPage';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
-  
+
   if (loading) {
-    return <div className="flex justify-center items-center" style={{height: '100vh'}}>Loading...</div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 text-[13px] text-slate-500">
+        Loading...
+      </div>
+    );
   }
-  
+
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 };
 
@@ -33,7 +36,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
-          
+
           <Route path="/" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
@@ -47,7 +50,7 @@ function App() {
             <Route path="activity-log" element={<ActivityLogPage />} />
             <Route path="about-tolunity" element={<AboutTolUnityPage />} />
           </Route>
-          
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>

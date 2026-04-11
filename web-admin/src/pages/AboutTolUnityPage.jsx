@@ -1,16 +1,24 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Image as ImageIcon, Video, Plus, Trash2 } from 'lucide-react';
-import { PageHeader, Card, Button, Badge } from '../components/UI';
 import api from '../services/api';
 import { getApiErrorMessage } from '../services/apiError';
-import './AboutTolUnityPage.css';
+import {
+  Badge,
+  Banner,
+  Button,
+  Field,
+  PageHeader,
+  inputClass,
+  tableCellClass,
+  tableHeaderClass,
+} from '../components/UI';
 
-const toDataUrl = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(reader.result);
-  reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
-  reader.readAsDataURL(file);
-});
+const toDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+    reader.readAsDataURL(file);
+  });
 
 const AboutTolUnityPage = () => {
   const [title, setTitle] = useState('');
@@ -18,19 +26,18 @@ const AboutTolUnityPage = () => {
   const [mediaItems, setMediaItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
+  const [message, setMessage] = useState(null);
 
   const fetchContent = useCallback(async () => {
     try {
-      setError(null);
       const response = await api.get('/admin/mobile-about');
       const data = response.data || {};
       setTitle(data.title || '');
       setDescription(data.description || '');
       setMediaItems(Array.isArray(data.mediaItems) ? data.mediaItems : []);
+      setMessage(null);
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'Failed to load mobile About content'));
+      setMessage({ tone: 'error', text: getApiErrorMessage(requestError, 'Failed to load mobile About content') });
     } finally {
       setLoading(false);
     }
@@ -47,16 +54,17 @@ const AboutTolUnityPage = () => {
     }
 
     try {
-      const nextItems = await Promise.all(files.map(async (file) => ({
-        id: `${file.name}-${file.lastModified}`,
-        mediaType,
-        mediaUrl: await toDataUrl(file),
-      })));
-
+      const nextItems = await Promise.all(
+        files.map(async (file) => ({
+          id: `${file.name}-${file.lastModified}`,
+          mediaType,
+          mediaUrl: await toDataUrl(file),
+        }))
+      );
       setMediaItems((current) => [...current, ...nextItems]);
-      setSuccess(null);
+      setMessage(null);
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'Failed to prepare selected files'));
+      setMessage({ tone: 'error', text: getApiErrorMessage(requestError, 'Failed to prepare selected files') });
     } finally {
       event.target.value = '';
     }
@@ -64,130 +72,124 @@ const AboutTolUnityPage = () => {
 
   const removeMediaItem = (itemId) => {
     setMediaItems((current) => current.filter((item) => item.id !== itemId));
-    setSuccess(null);
+    setMessage(null);
   };
 
   const handleSave = async () => {
     if (!title.trim()) {
-      setError('Title is required.');
+      setMessage({ tone: 'error', text: 'Title is required.' });
       return;
     }
 
     setSaving(true);
-    setError(null);
-    setSuccess(null);
     try {
       await api.put('/admin/mobile-about', {
         title: title.trim(),
         description: description.trim(),
         mediaItems,
       });
-      setSuccess('Mobile About content updated successfully.');
+      setMessage({ tone: 'success', text: 'Mobile About content updated.' });
       await fetchContent();
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'Failed to save mobile About content'));
+      setMessage({ tone: 'error', text: getApiErrorMessage(requestError, 'Failed to save mobile About content') });
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-muted">Loading mobile About content...</div>;
+    return <div className="px-3 py-4 text-[13px] text-slate-500">Loading mobile About content...</div>;
   }
 
   return (
-    <div className="fade-in">
+    <div className="text-[13px]">
       <PageHeader
-        title="Mobile About TolUnity"
-        subtitle="Control the About TolUnity page shown inside the mobile app."
-        action={<Button onClick={handleSave} isLoading={saving}>Save Changes</Button>}
+        eyebrow="Mobile"
+        title="About TolUnity"
+        subtitle="Edit the mobile About page title, description, and media inventory."
+        actions={
+          <Button onClick={handleSave} isLoading={saving}>
+            Save Changes
+          </Button>
+        }
       />
 
-      {error && <div className="about-banner about-banner-error">{error}</div>}
-      {success && <div className="about-banner about-banner-success">{success}</div>}
+      {message && <Banner tone={message.tone}>{message.text}</Banner>}
 
-      <div className="about-grid">
-        <Card>
-          <div className="form-field">
-            <label htmlFor="about-title">Title</label>
+      <section className="border-b border-slate-200 px-5 py-5">
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="Title" className="md:col-span-2">
             <input
-              id="about-title"
-              type="text"
+              className={inputClass}
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="About TolUnity"
             />
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="about-description">Description</label>
+          </Field>
+          <Field label="Description" className="md:col-span-2">
             <textarea
-              id="about-description"
-              rows="8"
+              className={inputClass}
+              rows="6"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Describe the app, community mission, or how residents should use TolUnity."
             />
-          </div>
+          </Field>
+          <Field label="Add Images">
+            <input className={inputClass} type="file" accept="image/*" multiple onChange={(event) => addMediaFiles(event, 'IMAGE')} />
+          </Field>
+          <Field label="Add Videos">
+            <input className={inputClass} type="file" accept="video/*" multiple onChange={(event) => addMediaFiles(event, 'VIDEO')} />
+          </Field>
+        </div>
+      </section>
 
-          <div className="media-toolbar">
-            <label className="upload-chip">
-              <Plus size={16} />
-              <span>Add Images</span>
-              <input type="file" accept="image/*" multiple onChange={(event) => addMediaFiles(event, 'IMAGE')} />
-            </label>
-            <label className="upload-chip">
-              <Plus size={16} />
-              <span>Add Videos</span>
-              <input type="file" accept="video/*" multiple onChange={(event) => addMediaFiles(event, 'VIDEO')} />
-            </label>
-          </div>
-        </Card>
-
-        <Card>
-          <div className="preview-header">
-            <div>
-              <h3>Mobile Preview</h3>
-              <p>This is the content the mobile profile menu will open.</p>
-            </div>
-            <Badge variant="primary">{mediaItems.length} media</Badge>
-          </div>
-
-          <div className="about-preview">
-            <h2>{title || 'About TolUnity'}</h2>
-            <p>{description || 'No description added yet.'}</p>
-
-            {mediaItems.length === 0 ? (
-              <div className="empty-preview">No images or videos added yet.</div>
-            ) : (
-              <div className="about-media-grid">
-                {mediaItems.map((item) => (
-                  <div key={item.id} className="about-media-card">
-                    <div className="about-media-top">
-                      <Badge variant={item.mediaType === 'VIDEO' ? 'warning' : 'primary'}>
-                        {item.mediaType === 'VIDEO' ? 'Video' : 'Image'}
-                      </Badge>
-                      <button type="button" className="icon-btn" onClick={() => removeMediaItem(item.id)}>
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              <th className={tableHeaderClass}>Type</th>
+              <th className={tableHeaderClass}>Preview</th>
+              <th className={tableHeaderClass}>URL</th>
+              <th className={tableHeaderClass}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {mediaItems.map((item) => (
+              <tr key={item.id}>
+                <td className={tableCellClass}>
+                  <Badge variant={item.mediaType === 'VIDEO' ? 'amber' : 'blue'}>
+                    {item.mediaType}
+                  </Badge>
+                </td>
+                <td className={tableCellClass}>
+                  <div className="w-24 overflow-hidden border border-slate-200">
                     {item.mediaType === 'VIDEO' ? (
-                      <video src={item.mediaUrl} controls className="about-video" />
+                      <video src={item.mediaUrl} controls className="h-16 w-full object-cover" />
                     ) : (
-                      <img src={item.mediaUrl} alt="About TolUnity media" />
+                      <img src={item.mediaUrl} alt="About TolUnity media" className="h-16 w-full object-cover" />
                     )}
-
-                    <div className="about-media-meta">
-                      {item.mediaType === 'VIDEO' ? <Video size={16} /> : <ImageIcon size={16} />}
-                      <span>{item.mediaType === 'VIDEO' ? 'Video attachment' : 'Image attachment'}</span>
-                    </div>
                   </div>
-                ))}
-              </div>
+                </td>
+                <td className={`${tableCellClass} font-mono text-[12px]`}>
+                  <div className="max-w-[480px] truncate">{item.mediaUrl}</div>
+                </td>
+                <td className={tableCellClass}>
+                  <Button variant="secondary" onClick={() => removeMediaItem(item.id)}>
+                    Remove
+                  </Button>
+                </td>
+              </tr>
+            ))}
+            {mediaItems.length === 0 && (
+              <tr>
+                <td colSpan="4" className="px-3 py-8 text-center text-[13px] text-slate-500">
+                  No media items added yet.
+                </td>
+              </tr>
             )}
-          </div>
-        </Card>
+          </tbody>
+        </table>
       </div>
     </div>
   );
