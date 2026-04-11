@@ -255,7 +255,13 @@ function CreatorVisitorsWorkspace() {
   }, []);
 
   const openPicker = useCallback((field) => {
-    setPicker({ field, mode: 'date', visible: true });
+    setPicker((current) => {
+      if (current.visible && current.field === field) {
+        return { field: null, mode: 'date', visible: false };
+      }
+
+      return { field, mode: 'date', visible: true };
+    });
   }, []);
 
   const handlePickerChange = useCallback((event, selectedDate) => {
@@ -390,15 +396,24 @@ function CreatorVisitorsWorkspace() {
       </ScrollView>
 
       {picker.visible ? (
-        <DateTimePicker
-          value={form[picker.field] || new Date()}
-          mode={picker.mode}
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          textColor={COLORS.textPrimary}
-          accentColor={COLORS.primary}
-          themeVariant="light"
-          onChange={handlePickerChange}
-        />
+        <View style={styles.pickerWrap}>
+          <DateTimePicker
+            value={form[picker.field] || new Date()}
+            mode={picker.mode}
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            textColor={COLORS.textPrimary}
+            accentColor={COLORS.primary}
+            themeVariant="light"
+            onChange={handlePickerChange}
+          />
+          <TouchableOpacity
+            style={styles.pickerCloseBtn}
+            onPress={() => setPicker({ field: null, mode: 'date', visible: false })}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.pickerCloseText}>Close Picker</Text>
+          </TouchableOpacity>
+        </View>
       ) : null}
 
       <QrPreviewModal visible={!!activeVisitor} visitor={activeVisitor} onClose={() => setActiveVisitor(null)} />
@@ -638,6 +653,17 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingVertical: SPACING.xxxl },
   emptyTitle: { marginTop: SPACING.md, color: COLORS.textPrimary, fontWeight: '800', fontSize: FONTS.sizes.md },
   emptyCopy: { marginTop: SPACING.sm, color: COLORS.textMuted, textAlign: 'center', lineHeight: 18 },
+  pickerWrap: { alignItems: 'center', marginBottom: SPACING.md },
+  pickerCloseBtn: {
+    marginTop: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    backgroundColor: COLORS.surfaceSoft,
+  },
+  pickerCloseText: { color: COLORS.primary, fontWeight: '800' },
   modalOverlay: { flex: 1, backgroundColor: COLORS.overlay, justifyContent: 'flex-end' },
   modalSheet: {
     backgroundColor: COLORS.bgCard,
