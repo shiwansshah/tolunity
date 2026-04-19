@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { clearStoredAuth, isTokenExpired } from '../services/authToken';
 import { AuthContext } from './authContextObject';
 
 export const AuthProvider = ({ children }) => {
@@ -10,13 +11,21 @@ export const AuthProvider = ({ children }) => {
     const checkAuth = async () => {
       const storedToken = localStorage.getItem('admin_token');
       const storedUser = localStorage.getItem('admin_user');
-      
+
+      if (storedToken && isTokenExpired(storedToken)) {
+        clearStoredAuth();
+
+        if (window.location.pathname !== '/login') {
+          window.location.assign('/login');
+          return;
+        }
+      }
+
       if (storedToken && storedUser) {
         try {
           setUser(JSON.parse(storedUser));
         } catch {
-          localStorage.removeItem('admin_token');
-          localStorage.removeItem('admin_user');
+          clearStoredAuth();
         }
       }
       setLoading(false);
@@ -49,8 +58,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_user');
+    clearStoredAuth();
     setUser(null);
     window.location.assign('/login');
   };

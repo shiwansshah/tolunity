@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { appConfig } from '../config/appConfig';
+import { clearStoredAuth, isTokenExpired } from './authToken';
 
 const api = axios.create({
   baseURL: appConfig.apiBaseUrl,
@@ -15,6 +16,16 @@ api.interceptors.request.use(
     config.headers = config.headers ?? {};
 
     if (token) {
+      if (isTokenExpired(token)) {
+        clearStoredAuth();
+
+        if (window.location.pathname !== '/login') {
+          window.location.assign('/login');
+        }
+
+        return Promise.reject(new Error('Session expired. Please login again.'));
+      }
+
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -29,8 +40,7 @@ api.interceptors.response.use(
 
     if (status === 401) {
       if (window.location.pathname !== '/login') {
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('admin_user');
+        clearStoredAuth();
         window.location.assign('/login');
       }
     }

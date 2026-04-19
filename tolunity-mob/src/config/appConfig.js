@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 
-const DEFAULT_API_BASE_URL = "http://192.168.1.9:8080/api";
+const DEFAULT_API_BASE_URL = "http://100.64.206.94:8080/api";
 
 const trimTrailingSlash = (value) => value?.replace(/\/+$/, "");
 
