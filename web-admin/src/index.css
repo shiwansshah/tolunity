@@ -22,7 +22,7 @@ html {
 
 body {
   margin: 0;
-  background: var(--slate-100);
+  background: #f4f6f9;
   color: var(--slate-700);
   font-family: var(--font-ui);
   font-size: 13px;
@@ -51,7 +51,7 @@ input,
 select,
 textarea {
   width: 100%;
-  border: 1px solid var(--slate-200);
+  border: 1px solid var(--slate-300);
   border-radius: var(--radius-md);
   background: #fff;
   color: var(--slate-700);
@@ -69,8 +69,8 @@ input:focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: var(--slate-900);
-  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.06);
+  border-color: #64748b;
+  box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.12);
 }
 
 textarea {

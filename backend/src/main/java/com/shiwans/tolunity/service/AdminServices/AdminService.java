@@ -4,8 +4,11 @@ import com.shiwans.tolunity.Repo.AdminRepos.CharityDonationRepository;
 import com.shiwans.tolunity.Repo.AdminRepos.FeeConfigRepository;
 import com.shiwans.tolunity.Repo.UserRepos.PaymentRepository;
 import com.shiwans.tolunity.Repo.UserRepository;
+import com.shiwans.tolunity.Util.PhoneNumberUtil;
 import com.shiwans.tolunity.Util.SecurityUtil;
 import com.shiwans.tolunity.config.ResourceNotFoundException;
+import com.shiwans.tolunity.dto.AdminCreateUserRequest;
+import com.shiwans.tolunity.dto.AdminResetUserPasswordRequest;
 import com.shiwans.tolunity.entities.Payments.CharityDonation;
 import com.shiwans.tolunity.entities.Payments.FeeConfig;
 import com.shiwans.tolunity.entities.Payments.Payment;
@@ -15,7 +18,9 @@ import com.shiwans.tolunity.enums.UserTypeEnum;
 import com.shiwans.tolunity.service.NotificationService;
 import com.shiwans.tolunity.service.PaymentDtoMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -46,6 +51,7 @@ public class AdminService {
     private final PaymentDtoMapper paymentDtoMapper;
     private final AdminAuditService adminAuditService;
     private final NotificationService notificationService;
+    private final PasswordEncoder passwordEncoder;
 
     public ResponseEntity<?> getDashboardStats() {
         List<User> allUsers = userRepository.findAllByDelFlgFalse();
@@ -57,6 +63,7 @@ public class AdminService {
         long totalUsers = allUsers.size();
         long ownersCount = allUsers.stream().filter(user -> user.getUserType() == UserTypeEnum.OWNER).count();
         long tenantsCount = allUsers.stream().filter(user -> user.getUserType() == UserTypeEnum.TENANT).count();
+        long securityCount = allUsers.stream().filter(user -> user.getUserType() == UserTypeEnum.SECURITY).count();
 
         double collectedRevenue = adminManagedPayments.stream()
                 .filter(payment -> "Paid".equalsIgnoreCase(payment.getStatus()))
@@ -74,6 +81,7 @@ public class AdminService {
         stats.put("totalUsers", totalUsers);
         stats.put("ownersCount", ownersCount);
         stats.put("tenantsCount", tenantsCount);
+        stats.put("securityCount", securityCount);
         stats.put("totalPayments", adminManagedPayments.size());
         stats.put("collectedRevenue", collectedRevenue);
         stats.put("pendingRevenue", pendingRevenue);
@@ -92,6 +100,42 @@ public class AdminService {
         return ResponseEntity.ok(userList);
     }
 
+    public ResponseEntity<?> createUser(AdminCreateUserRequest request) {
+        String name = normalizeRequiredText(request.getName(), "name");
+        String normalizedEmail = normalizeEmail(request.getEmail());
+        String phoneNumber = normalizePhoneNumber(request.getPhoneNumber());
+        String password = validatePassword(request.getPassword());
+        UserTypeEnum userType = resolveAdminManagedUserType(request.getUserType());
+
+        if (userRepository.findByNormalizedEmail(normalizedEmail).isPresent()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Email is already registered!"));
+        }
+
+        User user = new User();
+        user.setName(name);
+        user.setEmail(normalizedEmail);
+        user.setPhoneNumber(phoneNumber);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setRole(UserRolesEnum.ROLE_USER);
+        user.setUserType(userType);
+        user.setActiveFlg(true);
+        user.setCreatedAt(new Date());
+
+        User savedUser = userRepository.save(user);
+        adminAuditService.logAction(
+                "USER_CREATED",
+                "USER",
+                savedUser.getId(),
+                "Created user account for " + savedUser.getEmail(),
+                "userType=" + savedUser.getUserType()
+        );
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "message", "User created successfully",
+                "user", mapUser(savedUser)
+        ));
+    }
+
     public ResponseEntity<?> toggleUserStatus(Long id) {
         User user = userRepository.findByIdAndDelFlgFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User with ID " + id + " not found"));
@@ -107,6 +151,30 @@ public class AdminService {
         );
 
         return ResponseEntity.ok(Map.of("message", "User status updated successfully", "isActive", user.isActiveFlg()));
+    }
+
+    public ResponseEntity<?> resetUserPassword(Long id, AdminResetUserPasswordRequest request) {
+        User user = userRepository.findByIdAndDelFlgFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User with ID " + id + " not found"));
+
+        if (!isAdminResettableUser(user)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Admins can only reset passwords for OWNER, TENANT, or SECURITY users"));
+        }
+
+        String password = validatePassword(request != null ? request.getNewPassword() : null);
+        user.setPassword(passwordEncoder.encode(password));
+        userRepository.save(user);
+
+        adminAuditService.logAction(
+                "USER_PASSWORD_RESET",
+                "USER",
+                user.getId(),
+                "Reset password for " + user.getEmail(),
+                "userType=" + user.getUserType()
+        );
+
+        return ResponseEntity.ok(Map.of("message", "User password reset successfully"));
     }
 
     public ResponseEntity<?> getAllPayments() {
@@ -384,6 +452,50 @@ public class AdminService {
         return feeType;
     }
 
+    private String normalizeRequiredText(String rawValue, String fieldName) {
+        String value = normalizeText(rawValue);
+        if (value == null) {
+            throw new IllegalArgumentException(fieldName + " is required");
+        }
+        return value;
+    }
+
+    private String normalizeEmail(String email) {
+        String normalizedEmail = email != null ? email.trim().toLowerCase(Locale.ROOT) : null;
+        if (normalizedEmail == null || normalizedEmail.isBlank()) {
+            throw new IllegalArgumentException("email is required");
+        }
+        return normalizedEmail;
+    }
+
+    private String normalizePhoneNumber(String phoneNumber) {
+        String normalizedPhoneNumber = PhoneNumberUtil.normalize(phoneNumber);
+        if (!PhoneNumberUtil.isValidNepalMobileNumber(normalizedPhoneNumber)) {
+            throw new IllegalArgumentException("Phone number must be 10 digits and start with 98 or 97");
+        }
+        return normalizedPhoneNumber;
+    }
+
+    private String validatePassword(String password) {
+        if (password == null || password.length() < 6) {
+            throw new IllegalArgumentException("Password must be at least 6 characters");
+        }
+        return password;
+    }
+
+    private UserTypeEnum resolveAdminManagedUserType(String rawUserType) {
+        if (rawUserType == null || rawUserType.isBlank()) {
+            throw new IllegalArgumentException("userType is required");
+        }
+
+        return switch (rawUserType.trim().toUpperCase(Locale.ROOT)) {
+            case "OWNER" -> UserTypeEnum.OWNER;
+            case "TENANT" -> UserTypeEnum.TENANT;
+            case "SECURITY" -> UserTypeEnum.SECURITY;
+            default -> throw new IllegalArgumentException("userType must be OWNER, TENANT, or SECURITY");
+        };
+    }
+
     private List<User> getEligiblePayers() {
         Set<Long> uniqueIds = new HashSet<>();
         List<User> payers = new ArrayList<>();
@@ -400,6 +512,16 @@ public class AdminService {
         });
 
         return payers;
+    }
+
+    private boolean isAdminResettableUser(User user) {
+        if (user.getRole() == UserRolesEnum.ROLE_ADMIN) {
+            return false;
+        }
+
+        return user.getUserType() == UserTypeEnum.OWNER
+                || user.getUserType() == UserTypeEnum.TENANT
+                || user.getUserType() == UserTypeEnum.SECURITY;
     }
 
     private boolean isAdminManagedCategory(String category) {

@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Download, Filter, RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import {
   Badge,
   Banner,
   Button,
+  Field,
   PageHeader,
   ToolbarIconButton,
   inputClass,
@@ -22,6 +24,10 @@ const UsersPage = () => {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [showFilters, setShowFilters] = useState(false);
+  const [passwordUser, setPasswordUser] = useState(null);
+  const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
+  const [passwordError, setPasswordError] = useState(null);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -53,6 +59,65 @@ const UsersPage = () => {
         tone: 'error',
         text: getApiErrorMessage(requestError, 'Failed to update user status'),
       });
+    }
+  };
+
+  const isResettableUser = (user) =>
+    user.role !== 'ADMIN' && ['OWNER', 'TENANT', 'SECURITY'].includes(user.userType || '');
+
+  const openPasswordModal = (user) => {
+    setPasswordUser(user);
+    setPasswordForm({ newPassword: '', confirmPassword: '' });
+    setPasswordError(null);
+  };
+
+  const closePasswordModal = (force = false) => {
+    if (resettingPassword && !force) {
+      return;
+    }
+
+    setPasswordUser(null);
+    setPasswordForm({ newPassword: '', confirmPassword: '' });
+    setPasswordError(null);
+  };
+
+  const handlePasswordFieldChange = (field, value) => {
+    setPasswordForm((current) => ({ ...current, [field]: value }));
+    if (passwordError) {
+      setPasswordError(null);
+    }
+  };
+
+  const handleResetPassword = async (event) => {
+    event.preventDefault();
+
+    const newPassword = passwordForm.newPassword.trim();
+    if (newPassword.length < 6) {
+      setPasswordError('New password must be at least 6 characters.');
+      return;
+    }
+
+    if (newPassword !== passwordForm.confirmPassword.trim()) {
+      setPasswordError('Passwords do not match.');
+      return;
+    }
+
+    if (!passwordUser) {
+      return;
+    }
+
+    try {
+      setResettingPassword(true);
+      await api.put(`/admin/users/${passwordUser.id}/password`, { newPassword });
+      setBanner({
+        tone: 'success',
+        text: `Password reset for ${passwordUser.name || passwordUser.email}.`,
+      });
+      closePasswordModal(true);
+    } catch (requestError) {
+      setPasswordError(getApiErrorMessage(requestError, 'Failed to reset user password'));
+    } finally {
+      setResettingPassword(false);
     }
   };
 
@@ -103,6 +168,11 @@ const UsersPage = () => {
         eyebrow="Accounts"
         title="User Management"
         subtitle="Search, filter, export, and lock registered user accounts."
+        actions={
+          <Link to="/manual-user-registration">
+            <Button variant="secondary">Manual Registration</Button>
+          </Link>
+        }
       />
 
       {error && <Banner>{error}</Banner>}
@@ -166,6 +236,7 @@ const UsersPage = () => {
               <option value="ALL">All</option>
               <option value="OWNER">OWNER</option>
               <option value="TENANT">TENANT</option>
+              <option value="SECURITY">SECURITY</option>
               <option value="UNKNOWN">UNKNOWN</option>
             </select>
           </div>
@@ -194,7 +265,17 @@ const UsersPage = () => {
                   <div className="font-mono text-[12px] text-slate-500">#{user.id}</div>
                 </td>
                 <td className={tableCellClass}>
-                  <Badge variant={user.userType === 'OWNER' ? 'blue' : 'slate'}>{user.userType || 'N/A'}</Badge>
+                  <Badge
+                    variant={
+                      user.userType === 'OWNER'
+                        ? 'blue'
+                        : user.userType === 'SECURITY'
+                          ? 'amber'
+                          : 'slate'
+                    }
+                  >
+                    {user.userType || 'N/A'}
+                  </Badge>
                 </td>
                 <td className={tableCellClass}>{user.role || 'N/A'}</td>
                 <td className={`${tableCellClass} font-mono text-[12px]`}>{user.email || '-'}</td>
@@ -206,13 +287,20 @@ const UsersPage = () => {
                 </td>
                 <td className={tableCellClass}>{user.delFlg ? 'Deleted flag' : '-'}</td>
                 <td className={tableCellClass}>
-                  <Button
-                    variant={user.activeFlg ? 'danger' : 'success'}
-                    onClick={() => handleToggleStatus(user.id)}
-                    disabled={user.role === 'ADMIN'}
-                  >
-                    {user.activeFlg ? 'Lock Access' : 'Unlock'}
-                  </Button>
+                  <div className="flex min-w-32 flex-col gap-2">
+                    <Button
+                      variant={user.activeFlg ? 'danger' : 'success'}
+                      onClick={() => handleToggleStatus(user.id)}
+                      disabled={user.role === 'ADMIN'}
+                    >
+                      {user.activeFlg ? 'Lock Access' : 'Unlock'}
+                    </Button>
+                    {isResettableUser(user) && (
+                      <Button variant="secondary" onClick={() => openPasswordModal(user)}>
+                        Reset Password
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -226,6 +314,65 @@ const UsersPage = () => {
           </tbody>
         </table>
       </div>
+
+      {passwordUser && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6"
+          onClick={closePasswordModal}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-slate-200 px-5 py-4">
+              <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Admin Reset</div>
+              <h3 className="mt-0.5 text-[16px] font-semibold text-slate-900">Reset User Password</h3>
+              <p className="mt-1 text-[13px] text-slate-500">
+                Set a new password for {passwordUser.name || passwordUser.email}. Their previous password is not required.
+              </p>
+            </div>
+
+            <form className="space-y-4 px-5 py-4" onSubmit={handleResetPassword}>
+              {passwordError && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+                  {passwordError}
+                </div>
+              )}
+
+              <Field label="New Password">
+                <input
+                  className={inputClass}
+                  type="password"
+                  autoComplete="new-password"
+                  value={passwordForm.newPassword}
+                  onChange={(event) => handlePasswordFieldChange('newPassword', event.target.value)}
+                  placeholder="Enter a new password"
+                />
+              </Field>
+
+              <Field label="Confirm Password">
+                <input
+                  className={inputClass}
+                  type="password"
+                  autoComplete="new-password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(event) => handlePasswordFieldChange('confirmPassword', event.target.value)}
+                  placeholder="Re-enter the new password"
+                />
+              </Field>
+
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+                <Button type="button" variant="secondary" onClick={closePasswordModal} disabled={resettingPassword}>
+                  Cancel
+                </Button>
+                <Button type="submit" isLoading={resettingPassword}>
+                  Save Password
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

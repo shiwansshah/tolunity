@@ -7,6 +7,7 @@ import AdminLayout from './layouts/AdminLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import UsersPage from './pages/UsersPage';
+import ManualUserRegistrationPage from './pages/ManualUserRegistrationPage';
 import PaymentsReportPage from './pages/PaymentsReportPage';
 import FeeConfigPage from './pages/FeeConfigPage';
 import CharityPage from './pages/CharityPage';
@@ -41,6 +42,7 @@ function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="users" element={<UsersPage />} />
+            <Route path="manual-user-registration" element={<ManualUserRegistrationPage />} />
             <Route path="payments" element={<PaymentsReportPage />} />
             <Route path="visitors" element={<VisitorsLogPage />} />
             <Route path="alerts" element={<AlertsPage />} />

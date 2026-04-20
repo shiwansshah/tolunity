@@ -3,6 +3,7 @@ import {
   BarChart, Bar, PieChart, Pie, Cell,
   ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
+import { CircleDollarSign, Users, Wallet, Landmark } from 'lucide-react';
 import api from '../services/api';
 import { Banner, PageHeader, tableCellClass, tableHeaderClass } from '../components/UI';
 import { getApiErrorMessage } from '../services/apiError';
@@ -17,7 +18,7 @@ const CHART_COLORS = {
   blue: '#2563eb',
 };
 
-const PIE_COLORS = [CHART_COLORS.slate900, CHART_COLORS.blue, CHART_COLORS.slate400];
+const PIE_COLORS = [CHART_COLORS.slate900, CHART_COLORS.blue, CHART_COLORS.amber, CHART_COLORS.slate400];
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -67,9 +68,10 @@ const Dashboard = () => {
   }
 
   const formatNPR = (amount) => `NPR ${(amount || 0).toLocaleString('en-IN')}`;
+  const securityUsers = stats.securityCount || 0;
   const otherUsers = Math.max(
     0,
-    (stats.totalUsers || 0) - (stats.ownersCount || 0) - (stats.tenantsCount || 0)
+    (stats.totalUsers || 0) - (stats.ownersCount || 0) - (stats.tenantsCount || 0) - securityUsers
   );
   const totalTrackedCapital = (stats.collectedRevenue || 0) + (stats.pendingRevenue || 0);
   const tenantPerOwner =
@@ -84,6 +86,7 @@ const Dashboard = () => {
   const userMixData = [
     { name: 'Owners', value: stats.ownersCount || 0 },
     { name: 'Tenants', value: stats.tenantsCount || 0 },
+    { name: 'Security', value: securityUsers },
     { name: 'Other', value: otherUsers },
   ].filter((d) => d.value > 0);
 
@@ -93,10 +96,10 @@ const Dashboard = () => {
   ];
 
   const statCells = [
-    { label: 'Total Users', value: stats.totalUsers || 0, accent: '#0f172a' },
-    { label: 'Collected Revenue', value: formatNPR(stats.collectedRevenue), accent: '#059669' },
-    { label: 'Pending Revenue', value: formatNPR(stats.pendingRevenue), accent: '#d97706' },
-    { label: 'Charity Fund', value: formatNPR(stats.charityTotal), accent: '#2563eb' },
+    { label: 'Total Users', value: stats.totalUsers || 0, accent: '#0f172a', Icon: Users },
+    { label: 'Collected Revenue', value: formatNPR(stats.collectedRevenue), accent: '#059669', Icon: CircleDollarSign },
+    { label: 'Pending Revenue', value: formatNPR(stats.pendingRevenue), accent: '#d97706', Icon: Wallet },
+    { label: 'Charity Fund', value: formatNPR(stats.charityTotal), accent: '#2563eb', Icon: Landmark },
   ];
 
   return (
@@ -107,12 +110,15 @@ const Dashboard = () => {
 
       {/* ── KPI Cards ── */}
       <div className="grid gap-3 border-b border-slate-200 p-4 sm:grid-cols-2 xl:grid-cols-4">
-        {statCells.map(({ label, value, accent }) => (
+        {statCells.map(({ label, value, accent, Icon }) => (
           <div
             key={label}
-            className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3"
-            style={{ borderLeftColor: accent, borderLeftWidth: '3px' }}
+            className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3.5 shadow-sm"
+            style={{ borderTopColor: accent, borderTopWidth: '3px' }}
           >
+            <div className="mt-0.5 rounded-md border border-slate-200 bg-slate-100 p-2 text-slate-600">
+              <Icon className="h-4 w-4" />
+            </div>
             <div>
               <div className="text-[11px] uppercase tracking-[0.1em] text-slate-500">{label}</div>
               <div className="mt-1 text-[18px] font-semibold tracking-[-0.02em] text-slate-900">
@@ -126,7 +132,7 @@ const Dashboard = () => {
       {/* ── Charts Row ── */}
       <div className="grid gap-px border-b border-slate-200 bg-slate-200 lg:grid-cols-3">
         {/* Revenue Chart */}
-        <div className="bg-white p-4">
+        <div className="bg-white p-4 shadow-sm">
           <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
             Revenue Breakdown
           </div>
@@ -155,7 +161,7 @@ const Dashboard = () => {
         </div>
 
         {/* User Mix Donut */}
-        <div className="bg-white p-4">
+        <div className="bg-white p-4 shadow-sm">
           <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
             User Distribution
           </div>
@@ -181,7 +187,7 @@ const Dashboard = () => {
             </ResponsiveContainer>
           </div>
           {/* Legend */}
-          <div className="flex justify-center gap-4 pt-1">
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 pt-1">
             {userMixData.map((d, i) => (
               <div key={d.name} className="flex items-center gap-1.5 text-[11px] text-slate-500">
                 <span
@@ -195,7 +201,7 @@ const Dashboard = () => {
         </div>
 
         {/* Fee Collection Chart */}
-        <div className="bg-white p-4">
+        <div className="bg-white p-4 shadow-sm">
           <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
             Fee Collection
           </div>
@@ -226,7 +232,7 @@ const Dashboard = () => {
 
       {/* ── Data Tables ── */}
       <div className="grid gap-px border-b border-slate-200 bg-slate-200 xl:grid-cols-3">
-        <section className="bg-white">
+        <section className="bg-white shadow-sm">
           <div className="border-b border-slate-200 px-4 py-3">
             <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">User Mix</div>
           </div>
@@ -243,6 +249,7 @@ const Dashboard = () => {
                 {[
                   ['Owners', stats.ownersCount || 0],
                   ['Tenants', stats.tenantsCount || 0],
+                  ['Security', securityUsers],
                   ['Other', otherUsers],
                 ].map(([label, value]) => (
                   <tr key={label}>
@@ -258,7 +265,7 @@ const Dashboard = () => {
           </div>
         </section>
 
-        <section className="bg-white">
+        <section className="bg-white shadow-sm">
           <div className="border-b border-slate-200 px-4 py-3">
             <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Fee Collection</div>
           </div>
@@ -284,7 +291,7 @@ const Dashboard = () => {
           </div>
         </section>
 
-        <section className="bg-white">
+        <section className="bg-white shadow-sm">
           <div className="border-b border-slate-200 px-4 py-3">
             <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">System Metrics</div>
           </div>

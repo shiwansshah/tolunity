@@ -1,5 +1,7 @@
 package com.shiwans.tolunity.controller.AdminController;
 
+import com.shiwans.tolunity.dto.AdminCreateUserRequest;
+import com.shiwans.tolunity.dto.AdminResetUserPasswordRequest;
 import com.shiwans.tolunity.dto.ComplaintDtos.UpdateComplaintStatusRequest;
 import com.shiwans.tolunity.service.MobileAboutContentService;
 import com.shiwans.tolunity.service.AdminServices.AdminAuditService;
@@ -34,9 +36,22 @@ public class AdminController {
         return adminService.getAllUsers();
     }
 
+    @PostMapping("/users")
+    public ResponseEntity<?> createUser(@RequestBody AdminCreateUserRequest request) {
+        return adminService.createUser(request);
+    }
+
     @PutMapping("/users/{id}/status")
     public ResponseEntity<?> toggleUserStatus(@PathVariable Long id) {
         return adminService.toggleUserStatus(id);
+    }
+
+    @PutMapping("/users/{id}/password")
+    public ResponseEntity<?> resetUserPassword(
+            @PathVariable Long id,
+            @RequestBody AdminResetUserPasswordRequest request
+    ) {
+        return adminService.resetUserPassword(id, request);
     }
 
     @GetMapping("/payments")
