@@ -1,13 +1,19 @@
 package com.shiwans.tolunity.service;
 
+import com.shiwans.tolunity.exception.EmailDeliveryException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailAuthenticationException;
+import org.springframework.mail.MailException;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class EmailService {
 
@@ -16,16 +22,20 @@ public class EmailService {
     @Value("${spring.mail.host:}")
     private String mailHost;
 
-    @Value("${app.mail.from-address:no-reply@tolunity.com}")
+    @Value("${spring.mail.username:}")
+    private String mailUsername;
+
+    @Value("${spring.mail.password:}")
+    private String mailPassword;
+
+    @Value("${app.mail.from-address:shiwans099@gmail.com}")
     private String fromAddress;
 
     @Value("${app.mail.from-name:TolUnity}")
     private String fromName;
 
     public void sendPasswordResetCode(String recipientEmail, String code) {
-        if (mailHost == null || mailHost.isBlank()) {
-            throw new IllegalStateException("Email service is not configured. Set MAIL_HOST, MAIL_USERNAME, and MAIL_PASSWORD.");
-        }
+        validateMailConfiguration();
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -35,8 +45,56 @@ public class EmailService {
             helper.setSubject("TolUnity password reset code");
             helper.setText(buildPasswordResetHtml(code), true);
             mailSender.send(message);
+        } catch (MailAuthenticationException exception) {
+            log.error("Mail authentication failed while sending password reset email to {} via host {} using username {}",
+                    recipientEmail, mailHost, mailUsername, exception);
+            throw new EmailDeliveryException(
+                    "Password reset email could not be sent right now. Please try again later.",
+                    "Mail authentication failed while sending password reset email",
+                    exception);
+        } catch (MailSendException exception) {
+            log.error("SMTP server rejected or could not deliver password reset email to {} via host {}",
+                    recipientEmail, mailHost, exception);
+            throw new EmailDeliveryException(
+                    "Password reset email could not be sent right now. Please try again later.",
+                    "SMTP server rejected password reset email",
+                    exception);
+        } catch (MailException exception) {
+            log.error("Mail transport error while sending password reset email to {} via host {}",
+                    recipientEmail, mailHost, exception);
+            throw new EmailDeliveryException(
+                    "Password reset email could not be sent right now. Please try again later.",
+                    "Mail transport failed while sending password reset email",
+                    exception);
         } catch (Exception exception) {
-            throw new IllegalStateException("Failed to send password reset email", exception);
+            log.error("Unexpected error while preparing password reset email for {}", recipientEmail, exception);
+            throw new EmailDeliveryException(
+                    "Password reset email could not be sent right now. Please try again later.",
+                    "Unexpected error while preparing password reset email",
+                    exception);
+        }
+    }
+
+    private void validateMailConfiguration() {
+        if (mailHost == null || mailHost.isBlank()) {
+            throw new EmailDeliveryException(
+                    "Password reset email is not available right now.",
+                    "Email service is not configured: MAIL_HOST is missing");
+        }
+        if (mailUsername == null || mailUsername.isBlank()) {
+            throw new EmailDeliveryException(
+                    "Password reset email is not available right now.",
+                    "Email service is not configured: MAIL_USERNAME is missing");
+        }
+        if (mailPassword == null || mailPassword.isBlank()) {
+            throw new EmailDeliveryException(
+                    "Password reset email is not available right now.",
+                    "Email service is not configured: MAIL_PASSWORD is missing");
+        }
+        if (fromAddress == null || fromAddress.isBlank()) {
+            throw new EmailDeliveryException(
+                    "Password reset email is not available right now.",
+                    "Email service is not configured: MAIL_FROM_ADDRESS or spring.mail.username is missing");
         }
     }
 

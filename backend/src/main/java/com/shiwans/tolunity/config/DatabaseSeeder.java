@@ -43,7 +43,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         normalizeUserColumns();
 
         String normalizedAdminEmail = adminEmail.trim().toLowerCase();
-        Optional<User> existingAdmin = userRepo.findUserByEmail(normalizedAdminEmail);
+        Optional<User> existingAdmin = userRepo.findByNormalizedEmail(normalizedAdminEmail);
         
         if (existingAdmin.isEmpty()) {
             User admin = new User();

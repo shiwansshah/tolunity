@@ -3,6 +3,8 @@ package com.shiwans.tolunity.Repo;
 import com.shiwans.tolunity.entities.User;
 import com.shiwans.tolunity.enums.UserRolesEnum;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -11,6 +13,9 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findUserByEmail(String email);
+    Optional<User> findFirstByEmailIgnoreCase(String email);
+    @Query("select u from User u where lower(trim(u.email)) = lower(trim(:email))")
+    Optional<User> findByNormalizedEmail(@Param("email") String email);
     User findUserById(Long id);
 
     Optional<User> findByIdAndDelFlgFalse(Long id);

@@ -12,7 +12,9 @@ import com.shiwans.tolunity.entities.PasswordResetCode;
 import com.shiwans.tolunity.entities.User;
 import com.shiwans.tolunity.enums.UserRolesEnum;
 import com.shiwans.tolunity.enums.UserTypeEnum;
+import com.shiwans.tolunity.exception.EmailDeliveryException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -21,6 +23,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.security.SecureRandom;
 import java.util.Date;
@@ -28,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AuthService {
 
@@ -48,20 +53,20 @@ public class AuthService {
         if (normalizedEmail == null || normalizedEmail.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
         }
-        if (userRepository.findUserByEmail(normalizedEmail).isPresent()) {
+        if (userRepository.findByNormalizedEmail(normalizedEmail).isPresent()) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Email is already registered!"));
         }
 
-        User user = new User();
-        user.setName(request.getName());
-        user.setEmail(normalizedEmail);
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setPhoneNumber(request.getPhoneNumber());
-        user.setRole(UserRolesEnum.ROLE_USER);
-        user.setCreatedAt(new Date());
-        user.setUserType(resolveUserType(request));
+            User user = new User();
+            user.setName(request.getName());
+            user.setEmail(normalizedEmail);
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+            user.setPhoneNumber(request.getPhoneNumber());
+            user.setRole(UserRolesEnum.ROLE_USER);
+            user.setCreatedAt(new Date());
+            user.setUserType(resolveUserType(request));
 
-        userRepository.save(user);
+            userRepository.save(user);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "User Registered successfully!"));
     }
@@ -76,7 +81,7 @@ public class AuthService {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(normalizedEmail, request.getPassword()));
 
-            Optional<User> user = userRepository.findUserByEmail(normalizedEmail);
+            Optional<User> user = userRepository.findByNormalizedEmail(normalizedEmail);
             if (user.isEmpty()) {
                 throw new UsernameNotFoundException("User Not Found!");
             }
@@ -117,35 +122,48 @@ public class AuthService {
         }
     }
 
+    @Transactional
     public ResponseEntity<?> requestPasswordReset(ForgotPasswordRequest request) {
         String normalizedEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null;
         if (normalizedEmail == null || normalizedEmail.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
         }
 
-        Optional<User> optionalUser = userRepository.findUserByEmail(normalizedEmail);
+        Optional<User> optionalUser = userRepository.findByNormalizedEmail(normalizedEmail);
         if (optionalUser.isEmpty()) {
+            log.info("Password reset requested for non-existent email {}", normalizedEmail);
             return ResponseEntity.ok(Map.of("message", "If the email exists, a verification code has been sent."));
         }
 
         try {
             User user = optionalUser.get();
             String code = generatePasswordResetCode();
+            log.info("Creating password reset code for userId={} email={}", user.getId(), user.getEmail());
             passwordResetCodeRepository.deleteByUserId(user.getId());
-            passwordResetCodeRepository.save(PasswordResetCode.builder()
+            PasswordResetCode savedResetCode = passwordResetCodeRepository.saveAndFlush(PasswordResetCode.builder()
                     .userId(user.getId())
                     .email(normalizedEmail)
                     .codeHash(passwordEncoder.encode(code))
                     .expiresAt(new Date(System.currentTimeMillis() + (passwordResetCodeExpirationMinutes * 60 * 1000)))
                     .build());
+            log.info("Password reset code persisted with id={} for userId={}", savedResetCode.getId(), user.getId());
             emailService.sendPasswordResetCode(normalizedEmail, code);
+            log.info("Password reset email dispatched for userId={} email={}", user.getId(), normalizedEmail);
             return ResponseEntity.ok(Map.of("message", "If the email exists, a verification code has been sent."));
-        } catch (IllegalStateException exception) {
+        } catch (EmailDeliveryException exception) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            log.warn("Password reset email failed for {}", normalizedEmail, exception);
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(Map.of("error", exception.getMessage()));
+                    .body(Map.of("error", exception.getClientMessage()));
+        } catch (Exception exception) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            log.error("Password reset request failed for {}", normalizedEmail, exception);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Password reset request could not be completed right now."));
         }
     }
 
+    @Transactional
     public ResponseEntity<?> resetPasswordWithCode(ResetPasswordWithCodeRequest request) {
         String normalizedEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null;
         String code = request.getCode() != null ? request.getCode().trim() : null;
@@ -161,7 +179,7 @@ public class AuthService {
             return ResponseEntity.badRequest().body(Map.of("error", "New password must be at least 6 characters"));
         }
 
-        Optional<User> optionalUser = userRepository.findUserByEmail(normalizedEmail);
+        Optional<User> optionalUser = userRepository.findByNormalizedEmail(normalizedEmail);
         if (optionalUser.isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Invalid email or verification code"));
         }
